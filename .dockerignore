@@ -1,0 +1,31 @@
+# Secrets and local vault state must never enter the Docker build context.
+.env*
+!.env.example
+vault/
+lifedb-vault/
+quarantine/
+runtime/
+
+# Local development and generated artifacts.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Repository metadata and agent/editor state.
+.git/
+.github/
+.agents/
+.codex/
+.idea/
+.vscode/
+*.swp
+*.swo

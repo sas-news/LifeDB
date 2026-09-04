@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/context-policy.schema.json",
+  "title": "LifeDB context policy 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "budget_chars",
+    "core_chars",
+    "continuity_chars",
+    "relevant_chars",
+    "default_sensitivity_ceiling"
+  ],
+  "properties": {
+    "schema": {"const": "0.2"},
+    "budget_chars": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "core_chars": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "continuity_chars": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "relevant_chars": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "default_sensitivity_ceiling": {
+      "type": "string",
+      "enum": ["public", "personal", "sensitive", "restricted"]
+    }
+  }
+}

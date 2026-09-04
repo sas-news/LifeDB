@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/vault.schema.json",
+  "title": "LifeDB vault metadata 0.2",
+  "type": "object",
+  "required": ["schema", "vault_id", "created_at"],
+  "properties": {
+    "schema": {"enum": ["0.1", "0.2"]},
+    "vault_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "created_at": {"$ref": "#/$defs/rfc3339"},
+    "generator": {"type": "string"}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    }
+  }
+}

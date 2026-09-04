@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/canon-document.schema.json",
+  "title": "LifeDB Canon document frontmatter 0.2",
+  "type": "object",
+  "required": ["type", "x-lifedb"],
+  "properties": {
+    "type": {"type": "string", "minLength": 1},
+    "title": {"type": "string"},
+    "description": {"type": "string"},
+    "resource": {"type": "string", "format": "uri-reference"},
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "status": {"enum": ["draft", "stable", "deprecated"]},
+    "stale_after": {"$ref": "#/$defs/rfc3339"},
+    "generated": {"$ref": "#/$defs/actorEvent"},
+    "verified": {
+      "oneOf": [
+        {"$ref": "#/$defs/verifiedEvent"},
+        {"type": "array", "items": {"$ref": "#/$defs/verifiedEvent"}}
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "x-lifedb": {"$ref": "#/$defs/lifedb"}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "uuid7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "actorEvent": {
+      "type": "object",
+      "required": ["by"],
+      "properties": {
+        "by": {"type": "string", "minLength": 1},
+        "at": {"$ref": "#/$defs/rfc3339"}
+      },
+      "additionalProperties": true
+    },
+    "verifiedEvent": {
+      "type": "object",
+      "required": ["by", "at"],
+      "properties": {
+        "by": {"type": "string", "minLength": 1},
+        "at": {"$ref": "#/$defs/rfc3339"}
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["resource"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "resource": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "author": {"type": "string"},
+        "last_modified": {"$ref": "#/$defs/rfc3339"},
+        "usage_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "lifedb": {
+      "type": "object",
+      "required": ["schema", "id", "sensitivity"],
+      "properties": {
+        "schema": {"enum": ["0.1", "0.2"]},
+        "id": {"$ref": "#/$defs/uuid7"},
+        "kind": {"type": "string", "minLength": 1},
+        "sensitivity": {"$ref": "#/$defs/sensitivity"},
+        "claims": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/claim"}
+        }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {"schema": {"const": "0.2"}},
+            "required": ["schema"]
+          },
+          "then": {
+            "properties": {
+              "claims": {
+                "items": {"$ref": "#/$defs/claimV02"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sensitivity": {
+      "enum": ["public", "personal", "sensitive", "restricted"]
+    },
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "predicate",
+        "object",
+        "statement",
+        "basis",
+        "certainty",
+        "state",
+        "observed_at",
+        "evidence"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid7"},
+        "subject": {"$ref": "#/$defs/uuid7"},
+        "predicate": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "object": {"$ref": "#/$defs/claimObject"},
+        "statement": {"type": "string", "minLength": 1},
+        "basis": {
+          "enum": ["declared", "observed", "inferred", "imported", "computed"]
+        },
+        "certainty": {
+          "enum": ["confirmed", "probable", "tentative", "unknown"]
+        },
+        "state": {
+          "enum": ["active", "superseded", "retracted", "disputed"]
+        },
+        "observed_at": {"$ref": "#/$defs/rfc3339"},
+        "valid": {"$ref": "#/$defs/validity"},
+        "evidence": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidenceRequirement"},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "supersedes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/uuid7"},
+          "uniqueItems": true
+        },
+        "superseded_by": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/uuid7"},
+          "uniqueItems": true
+        },
+        "sensitivity": {"$ref": "#/$defs/sensitivity"}
+      },
+      "additionalProperties": true
+    },
+    "claimV02": {
+      "allOf": [
+        {"$ref": "#/$defs/claim"},
+        {
+          "properties": {
+            "evidence": {
+              "items": {"$ref": "#/$defs/evidenceRequirementV02"}
+            }
+          }
+        }
+      ]
+    },
+    "evidenceRequirementV02": {
+      "type": "object",
+      "required": ["id", "requires"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid7"},
+        "requires": {
+          "type": "string",
+          "pattern": "^(?:raw|record-only|representation:[a-z][a-z0-9._-]*)$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRequirement": {
+      "oneOf": [
+        {"$ref": "#/$defs/uuid7"},
+        {
+          "type": "object",
+          "required": ["id", "requires"],
+          "properties": {
+            "id": {"$ref": "#/$defs/uuid7"},
+            "requires": {
+              "type": "string",
+              "pattern": "^(?:raw|record-only|representation:[a-z][a-z0-9._-]*)$"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "claimObject": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["ref"],
+          "properties": {"ref": {"$ref": "#/$defs/uuid7"}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["text"],
+          "properties": {"text": {"type": "string"}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["boolean"],
+          "properties": {"boolean": {"type": "boolean"}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["number"],
+          "properties": {
+            "number": {"type": "number"},
+            "unit": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["date"],
+          "properties": {
+            "date": {"type": "string", "format": "date"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["datetime"],
+          "properties": {
+            "datetime": {"$ref": "#/$defs/rfc3339"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["uri"],
+          "properties": {
+            "uri": {"type": "string", "format": "uri"}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["json"],
+          "properties": {"json": true},
+          "additionalProperties": false
+        }
+      ]
+    },
+    "validity": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "from": {
+          "type": "string",
+          "anyOf": [{"format": "date"}, {"$ref": "#/$defs/rfc3339"}]
+        },
+        "until": {
+          "type": "string",
+          "anyOf": [{"format": "date"}, {"$ref": "#/$defs/rfc3339"}]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    }
+  }
+}

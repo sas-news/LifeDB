@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/context-pack.schema.json",
+  "title": "LifeDB authorized Context Pack 0.2",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "generated_at",
+    "query",
+    "core",
+    "continuity",
+    "relevant",
+    "evidence_handles",
+    "rendered_markdown",
+    "authorization",
+    "budget",
+    "watermark",
+    "truncated",
+    "degraded"
+  ],
+  "properties": {
+    "schema": {"const": "0.2"},
+    "id": {"$ref": "#/$defs/uuid7"},
+    "generated_at": {"$ref": "#/$defs/rfc3339"},
+    "query": {"type": "string"},
+    "client": {"type": "string"},
+    "core": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "continuity": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "relevant": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "evidence_handles": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/uuid7"},
+      "uniqueItems": true
+    },
+    "rendered_markdown": {"type": "string"},
+    "authorization": {
+      "type": "object",
+      "required": ["principal", "sensitivity_ceiling"],
+      "properties": {
+        "principal": {"type": "string", "minLength": 1},
+        "sensitivity_ceiling": {
+          "enum": ["public", "personal", "sensitive", "restricted"]
+        },
+        "destination": {"type": "string"},
+        "purpose": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "budget": {
+      "type": "object",
+      "required": ["budget_chars", "core_chars", "continuity_chars", "relevant_chars", "used_chars"],
+      "properties": {
+        "budget_chars": {"type": "integer", "minimum": 0},
+        "core_chars": {"type": "integer", "minimum": 0},
+        "continuity_chars": {"type": "integer", "minimum": 0},
+        "relevant_chars": {"type": "integer", "minimum": 0},
+        "used_chars": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "watermark": {
+      "type": "object",
+      "required": ["durable_sequence", "indexed_sequence", "dirty"],
+      "properties": {
+        "durable_sequence": {"type": "integer", "minimum": 0},
+        "indexed_sequence": {"type": "integer", "minimum": 0},
+        "dirty": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "truncated": {"type": "boolean"},
+    "truncation": {"type": "array", "items": {"type": "string"}},
+    "degraded": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "uuid7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "item": {
+      "type": "object",
+      "required": ["source_kind", "source_id", "title", "snippet"],
+      "properties": {
+        "source_kind": {"enum": ["canon", "evidence"]},
+        "source_id": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "snippet": {"type": "string"},
+        "path": {"type": "string"},
+        "score": {"type": "number"},
+        "sensitivity": {
+          "enum": ["public", "personal", "sensitive", "restricted"]
+        },
+        "truncated": {"type": "boolean"},
+        "untrusted": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,39 @@
+name: lifedb
+
+services:
+  lifedb:
+    build:
+      context: .
+    image: lifedb:0.2
+    restart: unless-stopped
+    user: "${LIFEDB_UID:-1000}:${LIFEDB_GID:-1000}"
+    environment:
+      LIFEDB_VAULT: /data
+      LIFEDB_SERVER_BIND: 0.0.0.0
+      LIFEDB_PORT: 7331
+      LIFEDB_API_TOKEN: "${LIFEDB_API_TOKEN:-}"
+      LIFEDB_SENSITIVITY_CEILING: "${LIFEDB_SENSITIVITY_CEILING:-personal}"
+      LIFEDB_INGEST_SENSITIVITY_FLOOR: "${LIFEDB_INGEST_SENSITIVITY_FLOOR:-personal}"
+    ports:
+      - "${LIFEDB_BIND:-127.0.0.1}:${LIFEDB_PORT:-7331}:7331"
+    volumes:
+      - type: bind
+        source: ${LIFEDB_VAULT:-./vault}
+        target: /data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7331/health', timeout=2).read()"
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

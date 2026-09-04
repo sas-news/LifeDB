@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lifedb"
+version = "0.2.0"
+description = "Recoverable, local-first personal memory reference implementation"
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0.2,<7",
+  "jsonschema>=4.23,<5"
+]
+
+[project.scripts]
+lifedb = "lifedb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/lifedb/schemas" = ["schemas/*.json"]
+
+[tool.unittest]
+start-directory = "tests"

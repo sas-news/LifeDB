@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install .
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q src tests
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install build
+      - run: python -m build --wheel --sdist
+      - name: Verify wheel contains every schema
+        run: |
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          expected = {
+              "canon-document.schema.json", "context-pack.schema.json",
+              "context-policy.schema.json", "evidence-event.schema.json",
+              "evidence-record.schema.json", "retention-policy.schema.json",
+              "vault.schema.json",
+          }
+          wheels = glob.glob("dist/*.whl")
+          if len(wheels) != 1:
+              raise SystemExit("expected exactly one wheel")
+          with zipfile.ZipFile(wheels[0]) as archive:
+              names = {name.rsplit("/", 1)[-1] for name in archive.namelist()}
+          missing = expected - names
+          if missing:
+              raise SystemExit(f"wheel is missing schemas: {sorted(missing)}")
+          PY
+      - name: Fresh install smoke
+        run: |
+          fresh_root="${RUNNER_TEMP}/lifedb-fresh"
+          fresh_venv="${RUNNER_TEMP}/lifedb-venv"
+          python -m venv "${fresh_venv}"
+          "${fresh_venv}/bin/python" -m pip install dist/*.whl
+          "${fresh_venv}/bin/lifedb" --vault "${fresh_root}" init
+          printf '%s' 'fresh install recoverable' | "${fresh_venv}/bin/lifedb" --vault "${fresh_root}" ingest - --media-type text/plain
+          "${fresh_venv}/bin/lifedb" --vault "${fresh_root}" validate
+          "${fresh_venv}/bin/lifedb" --vault "${fresh_root}" rebuild
+          "${fresh_venv}/bin/lifedb" --vault "${fresh_root}" search recoverable
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build --tag lifedb:test .
+      - name: Recovery smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/lifedb-vault"
+          run_args=(--rm --read-only --tmpfs /tmp:size=64m,mode=1777 --cap-drop ALL --security-opt no-new-privileges:true --user "$(id -u):$(id -g)" -v "$RUNNER_TEMP/lifedb-vault:/data" lifedb:test)
+          docker run "${run_args[@]}" init
+          printf '%s' 'recoverable memory' | docker run -i "${run_args[@]}" ingest - --media-type text/plain
+          docker run "${run_args[@]}" validate
+          docker run "${run_args[@]}" runtime reset --confirm DELETE-RUNTIME
+          docker run "${run_args[@]}" rebuild
+          docker run "${run_args[@]}" validate
+          docker run "${run_args[@]}" search recoverable

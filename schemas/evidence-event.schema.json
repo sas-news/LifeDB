@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/evidence-event.schema.json",
+  "title": "LifeDB append-only lifecycle and audit event 0.2",
+  "type": "object",
+  "required": [
+    "schema", "record_type", "id", "sequence", "previous_event",
+    "event_type", "recorded_at", "actor", "data", "sensitivity",
+    "sealed", "integrity"
+  ],
+  "properties": {
+    "schema": {"const": "0.2"},
+    "record_type": {"const": "event"},
+    "id": {"$ref": "#/$defs/uuid7"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "previous_event": {"oneOf": [{"$ref": "#/$defs/uuid7"}, {"type": "null"}]},
+    "event_type": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$"},
+    "recorded_at": {"$ref": "#/$defs/rfc3339"},
+    "actor": {"type": "string", "minLength": 1},
+    "target": {"$ref": "#/$defs/uuid7"},
+    "data": true,
+    "sensitivity": {"enum": ["public", "personal", "sensitive", "restricted"]},
+    "sealed": {"const": true},
+    "integrity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "uuid7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    }
+  }
+}

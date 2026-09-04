@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/retention-policy.schema.json",
+  "title": "LifeDB retention policy 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "grace_days", "holds", "automatic_eviction"],
+  "properties": {
+    "schema": {"const": "0.2"},
+    "grace_days": {"type": "integer", "minimum": 0, "maximum": 36500},
+    "holds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "objects"],
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "objects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "automatic_eviction": {"const": false}
+  }
+}

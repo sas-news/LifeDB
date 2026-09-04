@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lifedb.dev/schemas/0.2/evidence-record.schema.json",
+  "title": "LifeDB immutable Evidence capture 0.2",
+  "type": "object",
+  "required": [
+    "schema", "record_type", "id", "kind", "captured_at", "ingested_at",
+    "source", "content", "payload", "representations", "sensitivity",
+    "producer", "sealed", "integrity"
+  ],
+  "properties": {
+    "schema": {"const": "0.2"},
+    "record_type": {"const": "capture"},
+    "id": {"$ref": "#/$defs/uuid7"},
+    "kind": {
+      "enum": ["artifact", "conversation", "event-batch", "web-capture", "message", "import", "augmentation"]
+    },
+    "captured_at": {"$ref": "#/$defs/rfc3339"},
+    "ingested_at": {"$ref": "#/$defs/rfc3339"},
+    "source": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "minLength": 1},
+        "account": {"type": "string"},
+        "device": {"type": "string"},
+        "external_id": {"type": "string", "minLength": 1},
+        "metadata": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "content": {
+      "type": "object",
+      "required": ["media_type", "size", "sha256"],
+      "properties": {
+        "media_type": {"type": "string", "minLength": 1},
+        "filename": {"type": "string"},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": true
+    },
+    "payload": {
+      "type": "object",
+      "required": ["state", "retention"],
+      "properties": {
+        "state": {"enum": ["present", "external", "missing"]},
+        "object": {"$ref": "#/$defs/objectRef"},
+        "retention": {"enum": ["pinned", "durable", "grace", "derivative-only", "reference-only"]},
+        "required_representations": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "present"}}, "required": ["state"]},
+          "then": {"required": ["object"]}
+        },
+        {
+          "if": {"properties": {"retention": {"const": "reference-only"}}, "required": ["retention"]},
+          "then": {
+            "properties": {"state": {"const": "external"}},
+            "not": {"required": ["object"]}
+          }
+        }
+      ]
+    },
+    "representations": {"type": "array", "items": {"$ref": "#/$defs/representation"}},
+    "sensitivity": {"$ref": "#/$defs/sensitivity"},
+    "producer": {"$ref": "#/$defs/producer"},
+    "sealed": {"const": true},
+    "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "uuid7": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "objectRef": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "integrity": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "sensitivity": {"enum": ["public", "personal", "sensitive", "restricted"]},
+    "producer": {
+      "type": "object",
+      "required": ["by", "version"],
+      "properties": {
+        "by": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "representation": {
+      "type": "object",
+      "required": ["role", "object", "media_type", "created_at", "producer"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "object": {"$ref": "#/$defs/objectRef"},
+        "media_type": {"type": "string", "minLength": 1},
+        "created_at": {"$ref": "#/$defs/rfc3339"},
+        "producer": {"$ref": "#/$defs/producer"},
+        "derived_from": {"$ref": "#/$defs/objectRef"}
+      },
+      "additionalProperties": true
+    }
+  }
+}
