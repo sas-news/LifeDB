@@ -1,204 +1,126 @@
-# LifeDB Philosophy and v0.2 Boundary
+# LifeDBの思想とv0.2の境界
 
-Status: v0.2 design baseline
+状態: v0.2設計ベースライン
 
-## Purpose
+## 目的
 
-LifeDB is a durable, local-first memory substrate owned by a person. It keeps
-accepted knowledge, observations, and retained artifacts usable without a
-particular database, model provider, agent host, or container image.
+LifeDBは、個人が所有するdurableでローカルファーストの記憶基盤である。承認済み知識、観測、保持対象の成果物を、特定のデータベース、モデルプロバイダー、エージェントホスト、コンテナイメージなしに利用可能に保つ。
 
-LifeDB does not claim to store truth. It stores what the owner currently accepts,
-what a source or process observed, and enough provenance to inspect the
-relationship between the two.
+LifeDBは真実を格納すると主張しない。所有者が現時点で承認している内容、情報源やプロセスが観測した内容、そして両者の関係を検査できる十分な来歴を格納する。
 
-## Authority model
+## 権威モデル
 
-LifeDB uses the following terms deliberately:
+LifeDBは以下の用語を意図的に使い分ける。
 
-| Component | Meaning | Authority |
+| 構成要素 | 意味 | 権威 |
 | --- | --- | --- |
-| Canon | The owner's accepted current model | Authoritative for current semantic state, but fallible and revisable |
-| Canon transactions | Before/after snapshots of accepted changes | Authoritative for Canon history and rollback; no arbitrary as-of query API |
-| Evidence | Immutable records of observations, imports, or captures | Authoritative only for what LifeDB recorded; not proof that a source was honest or correct |
-| Objects | Retained raw or derived bytes | Authoritative for byte identity while present; availability is policy-dependent |
-| Policies | Owner-controlled authorization, retention, and disclosure rules | Authoritative for actions taken by the service |
-| Runtime | Search indexes, graphs, embeddings, caches, and effective views | Never authoritative; fully reconstructable |
-| Context Packs | Authorized, budgeted runtime selections for a client request | Never authoritative; short-lived and purpose-bound |
+| Canon（カノン） | 所有者が承認した現行モデル | 現行セマンティック状態について権威を持つが、誤り得るものであり改訂可能 |
+| Canonトランザクション | 承認済み変更の前後スナップショット | Canon履歴とロールバックについて権威を持つ。任意時点照会APIは持たない |
+| Evidence（証跡） | 観測、取込み、取得の不変記録 | LifeDBが記録した内容についてのみ権威を持つ。情報源が正直または正確だったことの証明にはならない |
+| Objects | 保持するrawまたは派生バイト列 | 存在する間のバイト同一性について権威を持つ。可用性はポリシー依存 |
+| ポリシー | 所有者が管理する認可、保持、開示規則 | サービスの動作について権威を持つ |
+| Runtime（ランタイム） | 検索索引、グラフ、埋め込み、キャッシュ、実効ビュー | 権威を持たない。完全に再構築可能 |
+| Context Pack（コンテキストパック） | クライアント要求向けに認可され予算化されたランタイム選択物 | 権威を持たない。短命で目的限定的 |
 
-Normative documents and user interfaces SHOULD avoid the labels "Semantic
-Truth" and "Evidence Truth." Canon is accepted knowledge, and Evidence is an
-observation record.
+規範的文書と利用者向け界面では、「Semantic Truth」「Evidence Truth」というラベルを避けるべきである（SHOULD）。Canon（カノン）は承認済み知識であり、Evidence（証跡）は観測記録である。
 
-## Governing principles
+## 指導原則
 
-### Owner sovereignty comes first
+### 所有者の主権を最優先にする
 
-The owner, not an agent, model provider, collector, or storage policy, controls
-the vault. Normal durable operations are append-only, but append-only history is
-not a reason to deny an owner-authorized erasure. An erasure may intentionally
-make historical reconstruction incomplete.
+保管庫を管理するのは、エージェント、モデルプロバイダー、収集器、格納ポリシーではなく所有者である。通常のdurable操作は追記専用だが、追記専用履歴は所有者消去を拒む理由にはならない。消去は意図的に履歴再構築を不完全にし得る。
 
-"Remember forever" means retain according to an explicit durable policy while
-the owner continues to authorize that retention. It does not mean
-technically or legally indelible storage.
+「ずっと覚える」とは、所有者がその保持を承認し続ける限り、明示的なdurableポリシーに従い保持することである。技術的または法的に消去不能な格納を意味しない。
 
-### Acceptance and observation remain separate
+### 承認と観測の分離
 
-Ingestion creates Evidence, not Canon knowledge. A conversation, web page,
-sensor event, or imported profile can be mistaken, malicious, ambiguous, or out
-of date. Promotion into Canon is a separate accepted change with its own actor,
-reason, inputs, and transaction.
+取込みはEvidence（証跡）を作り、Canon（カノン）知識は作らない。会話、ウェブページ、センサーイベント、導入プロファイルは、誤り、悪意、曖昧さ、陳腐化があり得る。Canon（カノン）への昇格は、アクター、理由、入力、トランザクションを個別に備えた別の承認済み変更である。
 
-A declaration such as "I use Zed" can be directly supported as a declaration
-without proving every possible interpretation of the real-world statement.
-Basis, evidential support, acceptance, and current validity MUST NOT be collapsed
-into a single numeric confidence value.
+「I use Zed」のような宣言は、現実世界の文のあらゆる解釈可能性を証明しなくても、宣言として直接裏付けできる。根拠、証跡による裏付け、承認、現行有効性を、単一の数値確信度にまとめてはならない（MUST NOT）。
 
-### Durable formats outlive implementations
+### durable形式は実装より長生きする
 
-Canon remains readable UTF-8 Markdown with YAML frontmatter. Evidence, lifecycle
-events, policies, and transaction manifests use openly specified UTF-8 data
-formats. Runtime databases are replaceable projections.
+Canon（カノン）はYAMLフロントマター付きUTF-8 Markdownとして可読であり続ける。Evidence（証跡）、ライフサイクルイベント、ポリシー、トランザクションマニフェストは、公開仕様のUTF-8データ形式を使う。ランタイムデータベースは置換可能な投影である。
 
-Rebuilds MUST use retained durable representations and MUST NOT require the
-original model that produced them. Unknown extension fields must survive any
-tool that rewrites a durable record.
+再構築は、保持されたdurable表現物を使わなければならず（MUST）、それらを生成した元のモデルを必要としてはならない（MUST NOT）。未知の拡張フィールドは、durable記録を書き換えるあらゆるツールで生き残らなければならない。
 
-### History is explicit
+### 履歴は明示的である
 
-Changing a Canon document is a transaction, whether the change was made by a
-human, a deterministic process, or an AI-assisted reconciler. A committed
-transaction contains the actor and durable before/after snapshots, not merely a
-diff or a pair of hashes. This supports snapshot-based history inspection and
-rollback without making Git a required database. The v0.2 reference has no
-general arbitrary-time Canon reconstruction API; its implementation exposes
-rollback by referring to transaction snapshots.
+Canon（カノン）文書の変更は、人間、決定論的プロセス、AI支援調整のいずれが行ってもトランザクションである。確定済みトランザクションは、差分や一組のハッシュだけでなく、アクターとdurableな前後スナップショットを含む。これにより、Gitを必須データベースにせず、スナップショット起点の履歴検査とロールバックを支える。v0.2リファレンスには汎用の任意時点Canon再構築APIはなく、実装はトランザクションスナップショットを指すロールバックを公開する。
 
-Rollback creates a compensating transaction. It does not rewrite history. Git
-may provide a useful review interface and additional history, but it is not the
-only audit or recovery mechanism.
+ロールバックは補償トランザクションを作る。履歴を書き換えない。Gitは有用なレビュー界面と追加履歴になり得るが、唯一の監査または復旧機構ではない。
 
-### Payload state is derived, not edited into Evidence
+### ペイロード状態は派生でありEvidence（証跡）に編集しない
 
-A sealed Evidence capture is never rewritten during normal operation. New
-representations, retention changes, holds, missing-object observations,
-evictions, and restorations are immutable lifecycle events. Runtime code folds
-the capture and its ordered events into an effective view.
+封印済みEvidence（証跡）取得記録は、通常運用中に書き換えない。新しい表現物、保持変更、ホールド、オブジェクト欠落の観測、退避、復元は不変ライフサイクルイベントである。ランタイムコードは、取得記録とその順序付きイベントを折りたたみ、実効ビューを作る。
 
-Every Claim-to-Evidence edge declares the minimum material it requires:
+すべてのClaim（主張）とEvidence（証跡）の辺は、必要とする最小資料を宣言する。
 
-- `raw`: the captured payload bytes must remain available;
-- `representation:<role>`: a retained representation with that role must remain
-  available;
-- `record-only`: the Evidence record is sufficient and payload bytes may be
-  evicted under policy.
+- `raw`: 取得ペイロードバイト列が利用可能でなければならない。
+- `representation:<role>`: そのロールを持つ保持済み表現物が利用可能でなければならない。
+- `record-only`: Evidence（証跡）記録で十分であり、ペイロードバイト列はポリシーに従い退避できる。
 
-Merely citing Evidence does not implicitly pin every raw payload. Conversely, an
-unsatisfied `raw` or `representation:<role>` requirement is a visible integrity
-failure, not a condition the query layer may silently ignore.
+Evidence（証跡）を引用するだけで、すべてのrawペイロードが暗黙に固定されるわけではない。逆に、満たされない`raw`または`representation:<role>`要件は、目に見える完全性障害であり、問合せ層が黙って無視できる条件ではない。
 
-### Disclosure is decided by the server
+### 開示はサーバーが決める
 
-Clients request context; they do not grant themselves access. The service
-in a full deployment derives allowed operations, sensitivity, destination, and
-expansion rights from an authenticated client policy. In the v0.2 reference,
-one owner Bearer token authorizes all HTTP operations; the server fixes the
-principal, destination, and purpose labels and applies one global sensitivity
-ceiling/floor and Context-budget profile. There are no per-client operation
-scopes or destination/purpose allowlists. A request field such as a sensitivity
-ceiling can narrow access but can never widen it.
+クライアントはコンテキストを要求する。自らにアクセスを許可するのではない。本番配置では、サービスは認証済みクライアントポリシーから許可操作、感度、宛先、展開権限を導出する。v0.2リファレンスでは、1つの所有者BearerトークンがすべてのHTTP操作を認可する。サーバーがプリンシパル、宛先、目的ラベルを固定し、1つの全体的な感度上限・下限とContext予算プロファイルを適用する。クライアントごとの操作スコープや宛先・目的許可リストはない。感度上限などの要求フィールドはアクセスを狭めることはできるが、広げることは決してできない。
 
-Context selection applies authorization before retrieval and rendering. It uses
-strict total and per-layer budgets, reports truncation and projection freshness,
-and marks retrieved material as untrusted data. Neither Canon nor Evidence may
-grant tool permissions, disclose secrets, or override host-level instructions.
+コンテキスト選択は、検索と描画の前に認可を適用する。厳密な全体予算と層別予算を使い、切詰めと投影鮮度を報告し、取得資料を信頼できないデータとして標示する。Canon（カノン）もEvidence（証跡）も、ツール権限の付与、秘密の開示、ホスト層指示の上書きをしてはならない。
 
-### Integrity is not authenticity
+### 完全性は真正性ではない
 
-A cryptographic digest detects a change to known bytes and supports content
-addressing. It does not establish who created the bytes, whether capture metadata
-is honest, whether a source was authorized, or whether a statement is true.
-Authenticity requires a trusted acquisition path, authenticated actor, signature,
-or other separately defined evidence.
+暗号ダイジェストは、既知バイト列への変化を検出し、内容アドレス指定を支える。バイト列の作成者、取得メタデータの正直さ、情報源の認可、文の真実性を示さない。真正性には、信頼できる取得経路、認証済みアクター、署名、または別途定義される証拠が必要である。
 
-## Immutability and erasure
+## 不変性と消去
 
-Normal operations preserve base records and append new events. Direct mutation
-is treated as corruption or an uncommitted manual edit. The following operation
-is intentionally different:
+通常操作は基底記録を保ち、新規イベントを追記する。直接書換えは破損または未確定手動編集として扱う。以下の操作は意図的に別物である。
 
-1. the authenticated owner selects an exact erasure scope;
-2. LifeDB previews affected Claims, Evidence, raw objects, representations,
-   transactions, runtime projections, and known backups;
-3. the owner authorizes the irreversible boundary;
-4. LifeDB removes or cryptographically erases the authorized material and
-   rebuilds affected projections;
-5. a minimal erasure receipt is retained only when the owner's policy permits
-   it.
+1. 認証済み所有者が厳密な消去範囲を選ぶ。
+2. LifeDBは影響を受けるClaim（主張）、Evidence（証跡）、rawオブジェクト、表現物、トランザクション、ランタイム投影、既知バックアップをプレビューする。
+3. 所有者が不可逆境界を承認する。
+4. LifeDBは承認済み資料を削除または暗号消去し、影響を受ける投影を再構築する。
+5. 最小の消去受領証は、所有者ポリシーが許す場合にのみ保持する。
 
-No automatic policy may invoke owner-authorized erasure. Storage eviction is a
-different operation: it follows retention policy, normally leaves the Evidence
-record intact, and may be reversible only during a configured trash or backup
-window.
+自動ポリシーは所有者消去を起動してはならない。格納退避は別の操作である。保持ポリシーに従い、通常はEvidence（証跡）記録を残し、設定済みのごみ箱またはバックアップ期間内でのみ可逆的であり得る。
 
-## v0.2 core boundary
+## v0.2中核境界
 
-Version 0.2 is a durable correctness and policy-enforcement kernel. It is not yet
-a complete autonomous memory product.
+バージョン0.2は、durable正確性とポリシー強制の中核である。まだ完全な自律記憶製品ではない。
 
-### In scope
+### スコープ内
 
-- the authority model and threat model;
-- immutable Evidence capture records and ordered lifecycle events;
-- effective payload and representation views rebuilt from durable files;
-- structured Claim evidence requirements (`raw`, `representation:<role>`, and
-  `record-only`);
-- durable Canon transactions with actor, reason, and before/after snapshots;
-- Canon transaction snapshot history and compensating rollback (without a
-  general arbitrary-time reconstruction API);
-- real schema and cross-record validation, including object reachability and
-  digest checks;
-- crash-safe atomic writes, a single-writer lock, and deterministic recovery;
-- complete lexical indexing of Canon Claims, readable Evidence, and retained
-  textual representations;
-- projection revision or watermark reporting;
-- authenticated local clients, server-side authorization, sensitivity filtering,
-  Context Pack budgets, and untrusted-content boundaries;
-- manual retention preview/apply/recovery with exact confirmation;
-- backup and empty-runtime recovery tests for the durable formats.
+- 権威モデルと脅威モデル。
+- 不変Evidence（証跡）取得記録と順序付きライフサイクルイベント。
+- durableファイルから再構築する実効ペイロード・表現物ビュー。
+- 構造化Claim（主張）証跡要件（`raw`、`representation:<role>`、`record-only`）。
+- アクター、操作、前後スナップショットを備えたdurableなCanonトランザクション。
+- Canonトランザクションのスナップショット履歴と補償ロールバック（汎用任意時点再構築APIなし）。
+- オブジェクト到達可能性とダイジェスト検査を含む実スキーマ・横断記録検証。
+- クラッシュセーフな不可分書込み、単一ライターロック、決定論的復旧。
+- Canon Claim（主張）、可読Evidence（証跡）、保持テキスト表現物の完全語彙索引。
+- 投影リビジョンまたはウォーターマーク報告。
+- 認証済みローカルクライアント、サーバー側認可、感度選別、Context Pack（コンテキストパック）予算、信頼できない内容境界。
+- 厳密確認付き手動保持プレビュー・適用・回復。
+- durable形式向けバックアップ・空ランタイム復旧試験。
 
-The reference has explicit resource ceilings: HTTP/CLI raw input 64 MiB,
-durable records 16 MiB, Canon/indexed text 8 MiB, frontmatter/CLI mappings/
-policies/source metadata 1 MiB each, event data 4 MiB, Context/Evidence
-expansion 1,000,000 characters, queries 4,096 characters, and search results
-100. Event append and external-ID lookup are O(N), with one durable writer at a
-time. These are safety bounds, not throughput guarantees.
+リファレンスには明示的な資源上限がある。HTTP・CLIのraw入力64 MiB、durable記録16 MiB、Canon・索引対象テキスト8 MiB、フロントマター・CLIマッピング・ポリシー・ソースメタデータ各1 MiB、イベントデータ4 MiB、Context・Evidence（証跡）展開1,000,000文字、問合せ4,096文字、検索結果100件である。イベント追記と外部ID照合はO(N)であり、durableライターは同時1つである。これらは安全上限であり、処理能力保証ではない。
 
-### Out of scope
+### スコープ外
 
-- automatic AI promotion, Candidate reconciliation, or personality inference;
-- automatic storage eviction or autonomous deletion;
-- passive screen, audio, mail, calendar, or browser collectors;
-- OCR, captioning, transcription, and other extraction pipelines;
-- vector search, graph ranking, learned reranking, and model-dependent retrieval;
-- automatic preflight/postflight integration for every agent host;
-- MCP compatibility and vendor-specific agent adapters;
-- multi-writer or multi-device synchronization, federation, and vault merging;
-- automatic entity merge/split and a comprehensive predicate ontology;
-- application-level object encryption and digital-signature infrastructure.
+- 自動AI昇格、Candidate（候補）照合、性格推定。
+- 自動格納退避または自律削除。
+- 受動的な画面、音声、メール、カレンダー、ブラウザー収集器。
+- OCR、キャプション生成、書き起こし、その他抽出パイプライン。
+- ベクトル検索、グラフランク付け、学習型リランキング、モデル依存検索。
+- 全エージェントホスト向け自動preflight/postflight統合。
+- MCP互換性とベンダー別エージェントアダプター。
+- 複数ライター・複数デバイス同期、連合、保管庫統合。
+- 自動エンティティ統合・分割と包括的述語オントロジー。
+- アプリケーション層オブジェクト暗号化とデジタル署名基盤。
 
-Deployments still require encrypted storage and encrypted backups appropriate to
-their threat environment. Features outside the v0.2 core must not be implied by
-conformance claims.
+配置には、脅威環境に応じた暗号化ストレージと暗号化バックアップが依然必要である。v0.2中核外の機能を、適合主張により示唆してはならない。
 
-The reference quarantine directory is chiefly retention-transaction staging;
-passive collector capture quarantine is future work. Remote exposure also needs
-TLS, a reverse proxy, destination policy, rate/quota controls, free-space
-monitoring, and security review. The reference has a single owner Bearer token
-without operation-level scopes and does not enforce those operational quotas.
+リファレンスのquarantineディレクトリは主に保持トランザクションのステージングである。受動収集器の取得隔離は将来課題である。外部公開にはさらにTLS、リバースプロキシ、宛先ポリシー、レート・割当管理、空き容量監視、明示的セキュリティレビューが必要である。リファレンスは操作層スコープを持たない単一所有者Bearerトークンであり、それら運用割当を強制しない。
 
-Owner-authorized erasure remains a specified safety boundary and design
-requirement, but the v0.2 reference implementation does not provide erasure
-preview or apply operations. Ordinary retention eviction is the implemented
-destructive data operation and preserves sealed Evidence and lifecycle history.
+所有者消去は、仕様化済みの安全境界および設計要件であり続けるが、v0.2リファレンス実装は消去プレビューも適用操作も提供しない。通常保持退避が、実装済みの破壊的データ操作であり、封印済みEvidence（証跡）とライフサイクル履歴を保持する。

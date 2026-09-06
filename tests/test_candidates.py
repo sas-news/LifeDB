@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 from lifedb.candidates import CandidateStateError, CandidateStore
+from lifedb.evidence import iter_events
 from lifedb.canon import (
     CanonIntegrityError,
     CanonNotFoundError,
@@ -470,6 +471,44 @@ class CandidateCanonTest(unittest.TestCase):
         self.assertCountEqual(outcomes, ["promoted", "already-terminal"])
         claims = parse_markdown(path).frontmatter["x-lifedb"]["claims"]
         self.assertEqual(len(claims), 1)
+
+    def test_candidate_confidence_stays_pending_and_promotion_is_rejected_without_side_effects(self):
+        path, document_id, _ = self.write_document()
+        candidate = self.store.create(
+            target_document_id=document_id,
+            claim=self.claim(confidence=0.87),
+            actor="agent:test",
+        )
+        self.assertEqual(candidate["status"], "pending")
+        self.assertEqual(candidate["claim"]["confidence"], 0.87)
+
+        canon_before = path.read_bytes()
+        objects_before = {
+            item.relative_to(self.root).as_posix()
+            for item in (self.root / "objects").rglob("*")
+            if item.is_file()
+        }
+        events_before = [
+            (event["id"], event["event_type"])
+            for event in iter_events(self.vault, verify=True)
+        ]
+
+        with self.assertRaisesRegex(ValueError, "confidence"):
+            self.store.promote(candidate["id"], actor="agent:test")
+
+        self.assertEqual(path.read_bytes(), canon_before)
+        objects_after = {
+            item.relative_to(self.root).as_posix()
+            for item in (self.root / "objects").rglob("*")
+            if item.is_file()
+        }
+        self.assertEqual(objects_after, objects_before)
+        events_after = [
+            (event["id"], event["event_type"])
+            for event in iter_events(self.vault, verify=True)
+        ]
+        self.assertEqual(events_after, events_before)
+        self.assertEqual(self.store.get(candidate["id"])["status"], "pending")
 
 
 if __name__ == "__main__":

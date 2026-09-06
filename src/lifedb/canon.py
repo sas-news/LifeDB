@@ -634,6 +634,12 @@ class CanonStore:
         if not is_uuid7(target_id):
             raise ValueError("candidate target_document_id must be a UUIDv7")
         proposal = validate_claim_proposal(candidate.get("claim", {}))
+        # SPEC 8.3: numeric model confidence may remain in a pending
+        # Candidate but must never enter Canon.  Reject the exact
+        # Claim-level key before any lock, snapshot, object store, event
+        # append, or compare-and-swap side effect.
+        if "confidence" in proposal:
+            raise ValueError("numeric model confidence must not be stored in Canon")
 
         with _vault_canon_lock(self.root):
             documents = self._load_documents()

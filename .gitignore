@@ -7,3 +7,4 @@ vault/
 dist/
 build/
 *.egg-info/
+.omo/run-continuation/

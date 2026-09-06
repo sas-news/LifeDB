@@ -1,71 +1,49 @@
-# LifeDB Durable Format and Canon Specification 0.2
+# LifeDB durable形式とCanon仕様 0.2
 
-Status: Draft executable specification  
-Software release line: 0.2.x  
-OKF target: 0.2  
-Schema dialect: JSON Schema 2020-12
+状態: 草案の実行可能仕様
+ソフトウェアのリリース系列: 0.2.x
+OKF対象: 0.2
+スキーマ方言: JSON Schema 2020-12
 
-## 1. Purpose
+## 1. 目的
 
-LifeDB represents a person's accepted current model and the observations from
-which that model was formed. Its durable state remains usable when a particular
-database, model provider, agent host, container image, or application ceases to
-exist.
+LifeDBは、個人の承認済み現行モデルと、そのモデル形成の根拠となった観測を表す。そのdurable状態は、特定のデータベース、モデルプロバイダー、エージェントホスト、コンテナイメージ、アプリケーションが失われても利用可能であり続ける。
 
-LifeDB distinguishes four stores:
+LifeDBは四つのストアを区別する。
 
-1. **Canon**: the owner's accepted current semantic model in `canon/`.
-2. **Evidence**: immutable capture records and append-only observation and
-   lifecycle events in `evidence/`.
-3. **Objects**: policy-retained raw, derived, and Canon snapshot bytes in
-   `objects/`.
-4. **Runtime**: disposable indexes, effective views, and caches in `runtime/`.
+1. **Canon（カノン）**: 所有者が承認した現行セマンティックモデルであり、`canon/`に置く。
+2. **Evidence（証跡）**: 不変の取得記録と追記専用の観測・ライフサイクルイベントであり、`evidence/`に置く。
+3. **Objects**: ポリシーに従い保持するraw、派生、Canonスナップショットのバイト列であり、`objects/`に置く。
+4. **Runtime**: 使い捨ての索引、実効ビュー、キャッシュであり、`runtime/`に置く。
 
-Canon is fallible and revisable. Evidence establishes what LifeDB recorded, not
-that a source was honest or that an assertion is objectively true. A digest
-establishes byte integrity, not authenticity. The normative philosophy and
-security boundaries are described in `docs/philosophy.md` and
-`docs/threat-model.md`.
+Canon（カノン）は誤り得るものであり、改訂可能である。Evidence（証跡）はLifeDBが何を記録したかを示すものであり、情報源が正直だったことや主張が客観的に真実であることを示さない。ダイジェストはバイト列の完全性を示すものであり、真正性を示さない。規範的な思想とセキュリティ境界は`docs/philosophy.md`と`docs/threat-model.md`で説明する。
 
-## 2. Normative language
+## 2. 規範的言語
 
-The terms MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are normative.
+MUST、MUST NOT、SHOULD、SHOULD NOT、MAY の各用語は規範的である。
 
-The durable format version is written as `"0.2"`. Software implementing this
-specification uses the `0.2.x` release line. API major version `/v1` is versioned
-independently from the durable format.
+durable形式版は`"0.2"`と表記する。この仕様を実装するソフトウェアは`0.2.x`リリース系列を使う。APIメジャー版`/v1`はdurable形式とは独立に版管理する。
 
-## 3. Core invariants
+## 3. 中核不変条件
 
-1. Canon documents MUST remain readable as UTF-8 Markdown without LifeDB.
-2. Canon documents MUST have parseable YAML frontmatter and an OKF `type`.
-3. Every LifeDB semantic object MUST have a stable UUIDv7 in `x-lifedb.id`.
-4. Stable identity MUST NOT depend on a filename, directory path, product name,
-   or agent host.
-5. A sealed capture or lifecycle event MUST NOT be edited during normal
-   operation.
-6. Current payload state and representations MUST be projected from an immutable
-   capture and its ordered lifecycle events.
-7. A semantic correction MUST create a new Claim and supersede, retract, or
-   dispute the old Claim.
-8. Every accepted Canon mutation MUST use a prepared/committed transaction with
-   durable before/after snapshots and an authenticated actor.
-9. Runtime state MUST be reconstructable without network access to an AI model.
-10. Embeddings, retrieval scores, and Context Packs MUST NOT be authoritative
-    data.
-11. Every AI-generated durable assertion or representation MUST retain
-    provenance, but provenance MUST NOT be presented as source authenticity.
-12. Every Claim-to-Evidence edge MUST state whether it requires raw bytes, a
-    named representation role, or only the Evidence record.
-13. Credentials, private keys, passwords, and authentication tokens MUST NOT be
-    deliberately stored in the vault.
-14. Unknown fields MUST be preserved by round-tripping durable-data tools.
-15. Authorization, sensitivity limits, and Context budgets MUST be resolved by
-    the server; client input may narrow but MUST NOT widen them.
-16. Normal operation is append-only, but an exact, explicitly confirmed,
-    owner-authorized erasure takes priority over historical completeness.
+1. Canon文書は、LifeDBなしにUTF-8 Markdownとして可読でなければならない（MUST）。
+2. Canon文書は、解析可能なYAMLフロントマターとOKFの`type`を持たなければならない（MUST）。
+3. すべてのLifeDBセマンティックオブジェクトは、`x-lifedb.id`に安定したUUIDv7を持たなければならない（MUST）。
+4. 安定したアイデンティティは、ファイル名、ディレクトリパス、製品名、エージェントホストに依存してはならない（MUST NOT）。
+5. 封印済みの取得記録またはライフサイクルイベントは、通常運用中に編集してはならない（MUST NOT）。
+6. 現行ペイロード状態と表現物は、不変の取得記録とその順序付きライフサイクルイベントから投影しなければならない（MUST）。
+7. 意味の修正は、新しいClaim（主張）を作成し、古いClaim（主張）を置換、撤回、または異議申立てしなければならない（MUST）。
+8. 承認済みのCanon変更はすべて、durableな前後スナップショットと認証済みアクターを備えた準備済み・確定済みトランザクションを使わなければならない（MUST）。
+9. ランタイム状態は、AIモデルへのネットワーク到達なしに再構築可能でなければならない（MUST）。
+10. 埋め込み、検索スコア、Context Pack（コンテキストパック）を権威あるデータとしてはならない（MUST NOT）。
+11. AI生成のdurableな主張や表現物はすべて来歴を保持しなければならない（MUST）が、来歴を情報源の真正性として提示してはならない（MUST NOT）。
+12. すべてのClaim（主張）とEvidence（証跡）の辺は、rawバイト列、名前付き表現物ロール、Evidence（証跡）記録のいずれを要するかを述べなければならない（MUST）。
+13. 資格情報、秘密鍵、パスワード、認証トークンを保管庫に意図的に格納してはならない（MUST NOT）。
+14. 未知フィールドは、durableデータ用ツールによる往復で保持しなければならない（MUST）。
+15. 認可、感度上限、Context予算はサーバーが解決しなければならない（MUST）。クライアント入力はそれらを狭めることはできるが、広げてはならない（MUST NOT）。
+16. 通常運用は追記専用であるが、厳密で明示的に確認された所有者承認の消去は、履歴の完全性より優先する。
 
-## 4. Vault layout
+## 4. 保管庫配置
 
 ```text
 vault/
@@ -94,24 +72,17 @@ vault/
 └── runtime/
 ```
 
-Time-based directories are physical partitions, not semantic identity. Canon
-paths are topic-oriented human-facing addresses. Snapshot objects needed by a
-prepared or committed Canon transaction are durable even though they live in the
-shared Object Store.
+時刻別ディレクトリは物理分割であり、意味的アイデンティティではない。Canonパスは話題指向の人間向けアドレスである。準備済みまたは確定済みCanonトランザクションが必要とするスナップショットオブジェクトは、共有Object Store内にあってもdurableである。
 
-In the v0.2 reference, `quarantine/` is primarily staging for a prepared
-retention transaction. It is not yet the capture landing zone for passive
-collectors; such collectors are outside the implementation boundary.
+v0.2リファレンスにおいて`quarantine/`は主に準備済み保持トランザクションのための中間領域である。受動収集器の取得着地点ではまだない。そのような収集器は実装境界の外である。
 
-## 5. Identifiers and ordering
+## 5. 識別子と順序
 
-### 5.1 Stable IDs
+### 5.1 安定ID
 
-Vaults, semantic objects, Claims, Evidence captures, events, Conflicts,
-Candidates, Canon transactions, and Context Packs use UUID version 7 as defined
-by RFC 9562. The canonical text form is lowercase with hyphens.
+保管庫、セマンティックオブジェクト、Claim（主張）、Evidence（証跡）取得記録、イベント、Conflict、Candidate（候補）、Canonトランザクション、Context Pack（コンテキストパック）は、RFC 9562が定めるUUIDバージョン7を使う。正準テキスト形はハイフン付き小文字である。
 
-UUIDs are stored bare in structured data. APIs MAY expose resolvable URIs:
+UUIDは構造化データ内では素の形で格納する。APIは解決可能なURIを公開してもよい（MAY）。
 
 ```text
 lifedb://<vault-id>/canon/<uuid>
@@ -120,32 +91,21 @@ lifedb://<vault-id>/claim/<uuid>
 lifedb://<vault-id>/object/sha256/<digest>
 ```
 
-`vault-id` is generated once by `lifedb init`. Export and merge tools MUST retain
-the origin vault ID when bare IDs leave one vault.
+`vault-id`は`lifedb init`で一度だけ生成する。素のIDが保管庫を離れる場合、エクスポートとマージのツールは由来保管庫IDを保持しなければならない（MUST）。
 
-### 5.2 Paths
+### 5.2 パス
 
-Moving a Canon file MUST NOT change its semantic ID or Claim IDs. LifeDB clients
-resolve structured references by UUID. A move can still break ordinary OKF
-Markdown links, so a conforming mover MUST update links or leave a redirecting
-stub at the old path.
+Canonファイルの移動は、そのセマンティックIDやClaim IDを変えてはならない（MUST NOT）。LifeDBクライアントは構造化参照をUUIDで解決する。それでも移動は通常のOKF Markdownリンクを壊し得るため、適合する移動処理はリンクを更新するか、旧パスにリダイレクト用スタブを残さなければならない（MUST）。
 
-### 5.3 Durable event order
+### 5.3 durableイベント順序
 
-Each v0.2 event receives a server-assigned, vault-global integer `sequence`
-starting at 1. `previous_event` is the UUIDv7 of the immediately preceding event,
-or `null` for sequence 1. Sequence, not a wall-clock timestamp or UUID sort order,
-defines the fold order.
+各v0.2イベントは、サーバーが割り当てる保管庫全体で一意な整数`sequence`を1から受け取る。`previous_event`は直前イベントのUUIDv7であり、連番が1の場合のみ`null`である。畳み込み順序を定めるのは、壁時計タイムスタンプやUUID整列順ではなく連番である。
 
-Under normal operation, sequences are unique and contiguous and every
-`previous_event` resolves. An owner-authorized erasure may intentionally create
-a documented history boundary.
+通常運用では、連番は一意かつ連続し、すべての`previous_event`は解決する。所有者承認の消去は、文書化された履歴境界を意図的に作ることがある。
 
-## 6. OKF v0.2 compatibility
+## 6. OKF v0.2互換性
 
-`canon/` is an OKF v0.2 knowledge bundle. The compatibility reference is the
-[OKF v0.2 specification](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md).
-Its root `index.md` SHOULD declare:
+`canon/`はOKF v0.2知識バンドルである。互換性の基準は[OKF v0.2仕様](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)である。そのルート`index.md`は次を宣言すべきである（SHOULD）。
 
 ```yaml
 ---
@@ -153,30 +113,19 @@ okf_version: "0.2"
 ---
 ```
 
-OKF v0.2 requires only `type` on a concept document. LifeDB defines a stricter
-profile by additionally requiring `x-lifedb` on LifeDB Canon concepts. Ordinary
-OKF consumers can ignore the extension and still read the Markdown.
+OKF v0.2は概念文書に`type`のみを要求する。LifeDBは、LifeDB Canon概念に`x-lifedb`も要求することで、より厳格なプロファイルを定める。通常のOKFコンシューマーは拡張を無視してもMarkdownを読める。
 
-LifeDB uses OKF fields such as `description`, `resource`, `tags`, `sources`,
-`generated`, `verified`, `status`, and `stale_after` instead of duplicating them
-inside `x-lifedb`.
+LifeDBは、`description`、`resource`、`tags`、`sources`、`generated`、`verified`、`status`、`stale_after`などOKFフィールドを使い、`x-lifedb`内に重複させない。
 
-Within an OKF `sources` entry, `resource` is required and `id` is optional. A
-LifeDB producer SHOULD add `id` when Markdown footnotes or another field need a
-stable per-source attribution key, but MUST NOT reject an otherwise valid OKF
-source merely because `id` is absent. OKF Concept IDs remain bundle-relative
-paths; `x-lifedb.id` supplies LifeDB's path-independent identity.
+OKF `sources`項目内では、`resource`が必須であり`id`は任意である。LifeDB生成器は、Markdown脚注や他フィールドが安定した情報源別帰属キーを要する場合に`id`を付すべきである（SHOULD）が、`id`がないという理由だけで他は有効なOKF情報源を拒否してはならない（MUST NOT）。OKF概念IDはバンドル相対パスのままであり、`x-lifedb.id`がLifeDBのパス非依存アイデンティティを与える。
 
-Unknown OKF types and unknown frontmatter fields MUST be tolerated and preserved.
-An OKF consumer that does not understand `x-lifedb` must still receive ordinary
-readable Markdown/YAML after round-tripping.
+未知のOKF型と未知のフロントマターフィールドは許容し保持しなければならない（MUST）。`x-lifedb`を理解しないOKFコンシューマーも、往復後に通常の可読Markdown/YAMLを受け取るものとする。
 
-## 7. Canon documents
+## 7. Canon文書
 
-Every non-reserved Markdown file under `canon/` has YAML frontmatter followed by
-ordinary Markdown. `index.md` and `log.md` follow OKF conventions.
+`canon/`配下の予約外Markdownファイルはすべて、YAMLフロントマターに続く通常Markdownを持つ。`index.md`と`log.md`はOKF慣行に従う。
 
-A minimal LifeDB Canon document is:
+最小のLifeDB Canon文書は次のとおりである。
 
 ```yaml
 ---
@@ -191,62 +140,55 @@ x-lifedb:
 ---
 ```
 
-The initial vocabulary is:
+初期語彙は次のとおりである。
 
-- `Profile`: identity, values, preferences, environment, and abilities;
-- `Entity`: a person, organization, product, place, work, or other referent;
-- `Project`: an undertaking with lifecycle and outcomes;
-- `Topic`: an area of sustained knowledge;
-- `Goal`: a desired future state with completion criteria;
-- `Decision`: alternatives, reasoning, choice, and consequences;
-- `Pattern`: a repeated tendency inferred across Evidence;
-- `Procedure`: reusable procedural knowledge;
-- `Conflict`: an unresolved or intentionally accepted contradiction among
-  Claims.
+- `Profile`: 身元、価値観、好み、環境、能力。
+- `Entity`: 人物、組織、製品、場所、著作物、その他の指示対象。
+- `Project`: ライフサイクルと成果を伴う取組み。
+- `Topic`: 継続的知識領域。
+- `Goal`: 完了条件を伴う望ましい将来状態。
+- `Decision`: 代替案、理由、選択、帰結。
+- `Pattern`: Evidence（証跡）を横断して推定した反復傾向。
+- `Procedure`: 再利用可能な手順知識。
+- `Conflict`: Claim（主張）間の未解決または意図的に受容した矛盾。
 
-This vocabulary is extensible. A Consumer MUST show an unknown type as a generic
-concept rather than dropping it.
+この語彙は拡張可能である。コンシューマーは未知の型を捨てず、汎用概念として表示しなければならない（MUST）。
 
-## 8. Claims
+## 8. Claim（主張）
 
-A Claim is an atomic, independently identified assertion embedded in the
-`x-lifedb.claims` array of the document that describes its subject. Generated
-views MAY show it elsewhere but MUST NOT create a second authoritative copy.
+Claim（主張）は、対象を記述する文書の`x-lifedb.claims`配列に埋め込まれる、独立に識別される不可分の主張である。生成ビューは他所に表示してもよい（MAY）が、二つ目の権威複製を作ってはならない（MUST NOT）。
 
-Required Claim fields are:
+必須Claimフィールドは次のとおりである。
 
-- `id`: Claim UUIDv7;
-- `subject`: semantic UUIDv7;
-- `predicate`: extensible lowercase predicate name;
-- `object`: exactly one typed value;
-- `statement`: a human-readable assertion meaningful without a predicate
-  registry;
-- `basis`: `declared`, `observed`, `inferred`, `imported`, or `computed`;
-- `certainty`: `confirmed`, `probable`, `tentative`, or `unknown`;
-- `state`: `active`, `superseded`, `retracted`, or `disputed`;
-- `observed_at`: when LifeDB learned or confirmed the assertion;
-- `evidence`: one or more typed Evidence edges.
+- `id`: ClaimのUUIDv7。
+- `subject`: セマンティックUUIDv7。
+- `predicate`: 拡張可能な小文字述語名。
+- `object`: 型付き値をちょうど一つ。
+- `statement`: 述語登録簿なしに意味が通じる人間可読の主張。
+- `basis`: `declared`、`observed`、`inferred`、`imported`、`computed`のいずれか。
+- `certainty`: `confirmed`、`probable`、`tentative`、`unknown`のいずれか。
+- `state`: `active`、`superseded`、`retracted`、`disputed`のいずれか。
+- `observed_at`: LifeDBが主張を学習または確認した時刻。
+- `evidence`: 一つ以上の型付きEvidence辺。
 
-Core predicates use the `lifedb.` prefix. Private extensions SHOULD use a stable
-producer namespace. Unknown predicates MUST be retained and displayed using
-`statement`.
+中核述語は`lifedb.`接頭辞を使う。独自拡張は安定した生成器名前空間を使うべきである（SHOULD）。未知述語は保持し、`statement`を用いて表示しなければならない（MUST）。
 
-### 8.1 Typed object values
+### 8.1 型付きオブジェクト値
 
-`object` contains exactly one of:
+`object`は次のうちちょうど一つを含む。
 
-- `ref`: UUIDv7 of another semantic object;
-- `text`: UTF-8 string;
-- `boolean`: JSON boolean;
-- `number`: finite JSON number, with an optional `unit` sibling;
-- `date`: RFC 3339 full-date;
-- `datetime`: RFC 3339 timestamp with explicit offset;
-- `uri`: absolute URI;
-- `json`: arbitrary finite JSON data for forward compatibility.
+- `ref`: 他セマンティックオブジェクトのUUIDv7。
+- `text`: UTF-8文字列。
+- `boolean`: JSON真偽値。
+- `number`: 有限JSON数値。任意の`unit`兄弟要素を伴うことがある。
+- `date`: RFC 3339完全日付。
+- `datetime`: 明示オフセット付きRFC 3339タイムスタンプ。
+- `uri`: 絶対URI。
+- `json`: 将来互換のための任意有限JSONデータ。
 
-### 8.2 Typed Evidence edges
+### 8.2 型付きEvidence辺
 
-New v0.2 Claims represent each Evidence reference as:
+新規v0.2 Claimは各Evidence参照を次の形で表す。
 
 ```yaml
 evidence:
@@ -258,273 +200,178 @@ evidence:
     requires: record-only
 ```
 
-The requirement means:
+要件の意味は次のとおりである。
 
-- `raw`: the effective Evidence payload must be `present` and its object must
-  verify;
-- `representation:<role>`: at least one retained, verifying representation with
-  exactly that non-empty role must be available;
-- `record-only`: the sealed capture record is sufficient.
+- `raw`: 実効Evidenceペイロードが`present`であり、そのオブジェクトが検証されること。
+- `representation:<role>`: 空でないロールがちょうどその値に一致し、保持され検証される表現物が少なくとも一つ利用できること。
+- `record-only`: 封印済み取得記録で十分である。
 
-A new v0.2 writer MUST NOT omit `requires`. For compatibility, a bare Evidence
-UUID from v0.1 is interpreted conservatively as `raw` and MUST be rewritten to
-the explicit mapping when migrated or promoted.
+新規v0.2書き手は`requires`を省略してはならない（MUST NOT）。互換性のため、v0.1の素のEvidence UUIDは保守的に`raw`と解釈し、移行または昇格の際に明示マッピングへ書き換えなければならない（MUST）。
 
-The requirement describes minimum retained support, not evidential strength or
-source authenticity. A currently unsatisfied requirement is a validation error
-and MUST be reported in Context rather than silently ignored.
+要件は保持すべき最小裏付けを記述するものであり、証拠の強さや情報源の真正性ではない。現在満たされない要件は検証エラーであり、黙って無視せずContext内で報告しなければならない（MUST）。
 
-### 8.3 Certainty and basis
+### 8.3 確実性と根拠
 
-`basis` describes how an assertion was obtained. `certainty` describes how
-directly available Evidence supports the exact assertion. Neither is a numerical
-probability. For example, `declared + confirmed` confirms that the declaration
-was recorded; it does not independently prove the declarant's statement.
+`basis`は主張の取得方法を記述する。`certainty`は、厳密な主張を直接に入手可能なEvidenceがどの程度裏付けるかを記述する。いずれも数値確率ではない。たとえば`declared + confirmed`は宣言が記録されたことを確認するものであり、宣言者の言明を独立に証明しない。
 
-Numeric model confidence MUST NOT be stored in Canon. It MAY appear in a pending
-Candidate or disposable runtime record.
+数値のモデル確信度をCanonに格納してはならない（MUST NOT）。保留中のCandidate（候補）または使い捨てランタイム記録には現れてもよい（MAY）。
 
-### 8.4 Valid and transaction time
+### 8.4 有効時間とトランザクション時間
 
-`valid.from` and exclusive `valid.until` describe when the assertion applies in
-the represented world. Bounds may be RFC 3339 dates or timestamps with explicit
-offsets. When both are present they MUST use comparable precision and `from`
-MUST be earlier than `until`. A missing bound means unknown, not a claim of
-infinite validity.
+`valid.from`と排他的`valid.until`は、主張が表す世界で適用される期間を記述する。境界はRFC 3339日付または明示オフセット付きタイムスタンプであってよい。両方ある場合は比較可能な精度を使わなければならず（MUST）、`from`は`until`より前でなければならない（MUST）。境界の欠落は未知を意味し、無限有効の主張ではない。
 
-`observed_at` is knowledge-observation time, not Canon transaction time.
-Transaction time is the sequence and commit time of the Canon transaction that
-accepted, superseded, disputed, or retracted the Claim. A future as-of view would
-use committed transaction sequence; the v0.2 reference exposes no general as-of
-API.
+`observed_at`は知識観測時刻であり、Canonトランザクション時刻ではない。トランザクション時刻とは、Claimを承認、置換、異議申立て、撤回したCanonトランザクションの連番と確定時刻である。将来のある時点ビューでは確定済みトランザクション連番を使うが、v0.2リファレンスは汎用時点APIを公開しない。
 
-### 8.5 Supersession and conflicts
+### 8.5 置換と競合
 
-Changing the meaning of a Claim requires a new Claim ID. A new Claim lists old
-Claim IDs in `supersedes`; old Claims move to `superseded` and list the new ID in
-`superseded_by` in the same Canon transaction. Retraction and dispute are also
-transactional changes.
+Claimの意味変更には新しいClaim IDが必要である。新しいClaimは旧Claim IDを`supersedes`に列挙し、旧Claimは同一Canonトランザクション内で`superseded`へ移り、`superseded_by`に新IDを列挙する。撤回と異議申立てもトランザクション変更である。
 
-A persistent contradiction involving multiple Claims is represented by a
-`Conflict` document. Its state is `open`, `resolved`, or `accepted`; `accepted`
-means ambiguity is intentionally retained. Retrieval MUST NOT arbitrarily choose
-one disputed Claim as uncontested current fact.
+複数Claimにわたる持続的矛盾は`Conflict`文書で表す。その状態は`open`、`resolved`、`accepted`のいずれかであり、`accepted`は曖昧さを意図的に残すことを意味する。検索は、異議のあるClaimの一つを無争の現行事実として独断で選んではならない（MUST NOT）。
 
-## 9. Provenance and sensitivity
+## 9. 来歴と感度
 
-Document-level provenance uses OKF `sources`, `generated`, and `verified`.
-Claim-level provenance uses typed Evidence edges. Markdown footnotes SHOULD use a
-matching `sources[].id` where one is present.
+文書レベルの来歴はOKFの`sources`、`generated`、`verified`を使う。Claimレベルの来歴は型付きEvidence辺を使う。Markdown脚注は、`sources[].id`がある場合に一致するものを使うべきである（SHOULD）。
 
-AI-produced durable material records the producing actor, model and process
-version when known. A reconciler MUST NOT label content human-verified merely
-because the underlying statement originated with the owner.
+AI生成のdurable資料は、判明している場合に生成アクター、モデル、処理バージョンを記録する。調整器は、言明の由来が所有者だという理由だけで人間検証済みと表示してはならない（MUST NOT）。
 
-The sensitivity levels are:
+感度レベルは次のとおりである。
 
-- `public`;
-- `personal`, the default for the v0.2 reference server profile and an
-  available default for a full-deployment client policy;
-- `sensitive`, requiring explicit deployment-policy authorization (a full
-  deployment may bind this to client and purpose; the reference uses its
-  server sensitivity ceiling);
-- `restricted`, confined to an approved local execution boundary.
+- `public`。
+- `personal`。v0.2リファレンスサーバープロファイルの既定であり、フル配置クライアントポリシーでも既定にできる。
+- `sensitive`。明示的な配置ポリシー承認を要する。フル配置ではクライアントと目的に束縛できる。リファレンスではサーバー感度上限を使う。
+- `restricted`。承認済みローカル実行境界内に限定する。
 
-A Claim may raise its document sensitivity but cannot lower it. Returned
-fragments use the maximum effective sensitivity of document, Claim, Evidence,
-representation, and applicable policy. Authorization is enforced before
-retrieval and rendering.
+Claimは文書感度を引き上げることはできるが、引き下げることはできない。返却断片は、文書、Claim、Evidence、表現物、適用ポリシーの実効感度の最大値を使う。認可は検索と描画の前に強制する。
 
-## 10. Evidence capture records
+## 10. Evidence取得記録
 
-New captures use schema `"0.2"`, `record_type: "capture"`, and validate against
-`schemas/evidence-record.schema.json`. A capture includes:
+新規取得はスキーマ`"0.2"`、`record_type: "capture"`を使い、`schemas/evidence-record.schema.json`に対して検証する。取得記録は次を含む。
 
-- UUIDv7 `id`;
-- `captured_at` and `ingested_at` with explicit offsets;
-- `source.kind` and optional URI, account, device, metadata, and `external_id`;
-- content media type, byte size, and bare lowercase SHA-256 digest;
-- initial payload state and retention class;
-- capture-time representations, normally an empty list;
-- sensitivity and producer;
-- `sealed: true`;
-- `integrity` in the form `sha256:<64 lowercase hexadecimal characters>`.
+- UUIDv7の`id`。
+- 明示オフセット付き`captured_at`と`ingested_at`。
+- `source.kind`と任意のURI、アカウント、機器、メタデータ、`external_id`。
+- 内容メディア種別、バイト長、素の小文字SHA-256ダイジェスト。
+- 初期ペイロード状態と保持区分。
+- 取得時点の表現物。通常は空一覧。
+- 感度と生成器。
+- `sealed: true`。
+- `sha256:<64 lowercase hexadecimal characters>`形の`integrity`。
 
-`integrity` is computed over the deterministic canonical UTF-8 JSON form of the
-record with the `integrity` member omitted. It detects later record modification;
-it is not a signature and does not authenticate the producer or source.
+`integrity`は、`integrity`メンバを除いた記録の決定論的正準UTF-8 JSON形に対して計算する。後の記録改変を検出するものであり、署名ではなく、生成器や情報源を認証しない。
 
-The capture file is atomically published only after every referenced retained
-object has been written and verified. Normal operations never edit it.
+取得記録ファイルは、参照する保持対象オブジェクトのすべてを書き込み検証した後にのみ不可分に公開する。通常操作で編集することはない。
 
-### 10.1 Idempotent source events
+### 10.1 べき等な情報源イベント
 
-Collectors and replayable imports SHOULD provide `source.external_id`. The
-idempotency key is scoped by the complete source envelope:
-`(source.kind, source.uri, source.account, source.device, source.external_id)`.
-For compatibility, legacy `source.metadata.account` and
-`source.metadata.device` values are promoted to the corresponding top-level
-source fields before this key is evaluated:
+収集器と再実行可能な取込みは`source.external_id`を与えるべきである（SHOULD）。べき等キーは完全な情報源外枠で範囲化する。`(source.kind, source.uri, source.account, source.device, source.external_id)`である。互換性のため、従来の`source.metadata.account`と`source.metadata.device`値は、このキー評価の前に対応するトップレベル情報源フィールドへ繰り上げる。
 
-- a replay with the same content digest returns the existing capture;
-- reuse with a different digest fails as a conflict;
-- absence of `external_id` creates a distinct capture even when bytes deduplicate.
+- 同一内容ダイジェストでの再実行は既存取得記録を返す。
+- 異なるダイジェストでの再利用は競合として失敗する。
+- `external_id`がない場合はバイト列が重複しても別の取得記録を作る。
 
-An external ID is provenance metadata, not authentication of the external
-system.
+外部IDは来歴メタデータであり、外部システムの認証ではない。
 
-### 10.2 Reference-only capture
+### 10.2 参照限定取得
 
-`retention: reference-only` requires an absolute `source.uri`. LifeDB records the
-observed content metadata and digest but MUST NOT store the original payload
-object. Its initial payload state is `external` and `payload.object` is absent.
+`retention: reference-only`は絶対`source.uri`を要する。LifeDBは観測した内容メタデータとダイジェストを記録するが、原本ペイロードオブジェクトを格納してはならない（MUST NOT）。その初期ペイロード状態は`external`であり、`payload.object`はない。
 
-Reference-only does not promise that the URI remains retrievable or unchanged.
-It is invalid for irreplaceable material unless the owner explicitly accepts
-that loss risk.
+参照限定は、URIが取得可能または不変のままであることを約束しない。所有者が喪失リスクを明示的に受容しない限り、代替不能資料には無効である。
 
-## 11. Immutable lifecycle events
+## 11. 不変ライフサイクルイベント
 
-Later representations and payload changes are recorded as schema `"0.2"`,
-`record_type: "event"` records beneath `evidence/_events/`. Each event includes:
+後の表現物とペイロード変更は、スキーマ`"0.2"`、`record_type: "event"`の記録として`evidence/_events/`配下に記録する。各イベントは次を含む。
 
-- UUIDv7 `id` and non-empty `event_type`;
-- vault-global positive integer `sequence`;
-- `previous_event`, the immediately preceding Event ID or `null`;
-- `recorded_at` with explicit offset;
-- authenticated or process-assigned `actor`;
-- optional UUIDv7 `target` and operation-specific `data`;
-- sensitivity, `sealed: true`, and `integrity` as `sha256:<digest>`.
+- UUIDv7の`id`と空でない`event_type`。
+- 保管庫全体で一意な正整数`sequence`。
+- 直前イベントIDまたは`null`である`previous_event`。
+- 明示オフセット付き`recorded_at`。
+- 認証済みまたは処理割当の`actor`。
+- 任意のUUIDv7 `target`と、操作固有で必須の`data`。
+- 感度、`sealed: true`、および`sha256:<digest>`形の`integrity`。
 
-Lifecycle events targeting an Evidence capture require `target`. Canon and
-Candidate transactions use the same ordered event envelope with their own UUIDv7
-targets.
+Evidence取得記録を対象とするライフサイクルイベントは`target`を要する。CanonトランザクションとCandidateトランザクションは、独自UUIDv7対象を持つ同一順序付きイベント外枠を使う。
 
-Canonical payload lifecycle names are:
+正準ペイロードライフサイクル名は次のとおりである。
 
-- `representation.added`;
-- `retention.changed`;
-- `hold.placed` and `hold.released`;
-- `payload.eviction-proposed` and `payload.evicted`;
-- `payload.missing-observed` and `payload.restored`;
-- `payload.redacted`.
+- `representation.added`。
+- `retention.changed`。
+- `hold.placed`と`hold.released`。
+- `payload.eviction-proposed`と`payload.evicted`。
+- `payload.missing-observed`と`payload.restored`。
+- `payload.redacted`。
 
-A representation event records role, object digest, media type, creation time,
-producer and version, and derivation source. A v0.2 reader MAY accept the legacy
-hyphenated aliases `representation-added`, `payload-evicted`,
-`payload-restored`, and `payload-redacted`; a v0.2 writer SHOULD emit dotted
-names.
+表現物イベントはロール、オブジェクトダイジェスト、メディア種別、作成時刻、生成器とバージョン、導出元を記録する。v0.2読み手は従来ハイフン名`representation-added`、`payload-evicted`、`payload-restored`、`payload-redacted`を受け入れてもよい（MAY）。v0.2書き手はドット名を出すべきである（SHOULD）。
 
-An effective Evidence view is the immutable capture folded with valid target
-events in `sequence` order. It is a runtime projection. Eviction, restoration,
-redaction, or representation creation MUST NOT rewrite the capture JSON.
+実効Evidenceビューとは、不変取得記録を`sequence`順の有効対象イベントで畳み込んだものである。これはランタイム投影である。退避、復元、墨消し、表現物作成のために取得記録JSONを書き換えてはならない（MUST NOT）。
 
-## 12. Object storage
+## 12. オブジェクト格納
 
-Raw, derived, and Canon snapshot bytes use SHA-256 content addressing:
+raw、派生、Canonスナップショットのバイト列はSHA-256内容アドレス指定を使う。
 
 ```text
 objects/sha256/ab/cd/abcdef...
 ```
 
-Objects are written atomically, their digest is verified before publication,
-and identical bytes are stored once. Metadata, sensitivity, retention, and holds
-belong to references and events rather than filenames.
+オブジェクトは不可分に書き込み、公開前にダイジェストを検証し、同一バイト列は一回だけ格納する。メタデータ、感度、保持、拘束はファイル名ではなく参照とイベントに属する。
 
-Because one digest can have references with different policies, retention uses
-the strongest current Claim requirement, transaction-snapshot requirement,
-explicit hold, and policy across all references. Direct access to a digest is
-not authorization to read its bytes.
+一つのダイジェストが異なるポリシーの参照を持ち得るため、保持は全参照にわたる最強の現行Claim要件、トランザクションスナップショット要件、明示拘束、ポリシーを使う。ダイジェストへの直接到達は、そのバイト列を読む認可ではない。
 
-The v0.2 retention classes are:
+v0.2保持区分は次のとおりである。
 
-- `pinned`: excluded from ordinary eviction proposals;
-- `durable`: retained until an explicit reviewed policy change;
-- `grace`: eligible for a proposal after its grace condition;
-- `derivative-only`: raw bytes may be proposed only after required durable
-  representations exist;
-- `reference-only`: URI and metadata are retained and original bytes were never
-  stored.
+- `pinned`: 通常の退避候補から除外する。
+- `durable`: 明示的で審査済みのポリシー変更まで保持する。
+- `grace`: 猶予条件後に候補化する。
+- `derivative-only`: 必要なdurable表現物が存在した後にのみrawバイト列を候補化する。
+- `reference-only`: URIとメタデータを保持し、原本バイト列は当初から格納しない。
 
-Retention execution is specified in `docs/retention.md`. Version 0.2 never
-performs an automatic deletion: it generates a preview and requires an explicit
-apply against that exact, revalidated preview.
+保持実行は`docs/retention.md`で規定する。バージョン0.2は自動削除を一切行わない。プレビューを生成し、その厳密で再検証されたプレビューに対する明示適用を要する。
 
-## 13. Canon transactions and rollback
+## 13. Canonトランザクションとロールバック
 
-Every managed Canon change uses ordered events and durable snapshots. A
-transaction includes UUIDv7 transaction ID, actor, operation, affected semantic
-document and path, input Candidate and Evidence IDs where applicable, and
-`sha256:` references to exact before and after Markdown bytes.
+管理下のCanon変更はすべて順序付きイベントとdurableスナップショットを使う。トランザクションは、UUIDv7トランザクションID、アクター、操作、影響セマンティック文書とパス、厳密な前後Markdownバイト列への`sha256:`参照、昇格向けCandidate・Claim IDまたはロールバック向け由来トランザクションIDを含む。
 
-The transaction protocol is:
+トランザクション手順は次のとおりである。
 
-1. acquire the single-writer Canon lock;
-2. read the current document and store verifying before/after snapshot objects;
-3. validate the proposed Canon graph and all typed Evidence requirements;
-4. append `canon.change-prepared`;
-5. atomically publish the after snapshot using a compare-and-swap check against
-   the before digest;
-6. append `canon.change-committed`, or restore the before snapshot and append
-   `canon.change-aborted` after failure.
+1. 単一書き手Canonロックを取得する。
+2. 現行文書を読み、検証済み前後スナップショットオブジェクトを格納する。
+3. 提案Canonグラフと全型付きEvidence要件を検証する。
+4. `canon.change-prepared`を追記する。
+5. 前ダイジェストに対するcompare-and-swap検査で後スナップショットを不可分に公開する。
+6. `canon.change-committed`を追記する。失敗時は前スナップショットに戻し`canon.change-aborted`を追記する。
 
-Only committed transactions affect accepted transaction history. Prepared-only
-transactions are recovery work, not accepted changes. Snapshot objects needed by
-prepared and committed transactions MUST NOT be evicted by ordinary retention.
+確定済みトランザクションのみが承認履歴に影響する。準備のみのトランザクションは回復作業であり、承認変更ではない。準備済みと確定済みトランザクションが必要とするスナップショットオブジェクトは、通常保持で退避してはならない（MUST NOT）。
 
-Rollback uses the same protocol with `canon.rollback-prepared` and
-`canon.rollback-committed`. It verifies that current bytes still match the source
-transaction's after snapshot and creates a compensating transaction; it never
-deletes the transaction being reversed.
+ロールバックは`canon.rollback-prepared`と`canon.rollback-committed`で同一手順を使う。現行バイト列が由来トランザクションの後スナップショットと一致することを検証し、補償トランザクションを作る。逆転対象トランザクションを削除することはない。
 
-Transaction snapshots provide durable Canon history and the source material for
-rollback. The v0.2 reference does not expose a general as-of Canon view or an
-API that selects state through an arbitrary requested durable sequence. Git
-commits MAY be attached for review, but Git is not required for transaction
-history or rollback.
+トランザクションスナップショットはdurableなCanon履歴とロールバックの素材を与える。v0.2リファレンスは汎用時点Canonビューや、任意要求durable連番で状態を選ぶAPIを公開しない。Gitコミットは照査用に付してもよい（MAY）が、トランザクション履歴やロールバックにGitは不要である。
 
-## 14. Candidate knowledge and reconciliation
+## 14. Candidate知識と照合
 
-Ingestion never writes Canon directly. Version 0.2 provides an explicit manual
-Candidate workflow:
+取込みはCanonに直接書かない。バージョン0.2は明示的手動Candidate（候補）ワークフローを提供する。
 
-1. create a Candidate for a target Canon document with a validated Claim
-   proposal and typed Evidence edges;
-2. inspect pending Candidates;
-3. explicitly reject one with actor and reason, or promote one;
-4. validate semantic references, Evidence requirements, sensitivity, temporal
-   fields, and supersession;
-5. promote through a prepared/committed Canon transaction;
-6. retain Candidate creation and terminal state as immutable events.
+1. 対象Canon文書向けCandidate（候補）を、検証済みClaim（主張）提案と型付きEvidence（証跡）辺とともに作る。
+2. 保留中Candidate（候補）を確認する。
+3. アクターと理由を添えて一件を明示的に却下する、または昇格する。
+4. 意味参照、Evidence要件、感度、時間フィールド、置換を検証する。
+5. 準備済み・確定済みCanonトランザクションで昇格する。
+6. Candidate（候補）作成と終端状態を不変イベントとして残す。
 
-Candidate state is `pending`, `promoted`, or `rejected` and is projected from
-events. A failed promotion leaves the Candidate pending after compensation.
+Candidate（候補）状態は`pending`、`promoted`、`rejected`のいずれかであり、イベントから投影する。昇格失敗後のCandidate（候補）は補償後に保留のまま残る。
 
-Automatic AI extraction, automatic Candidate creation, automatic promotion, and
-background reconciliation are outside v0.2. An AI-authored proposal may enter
-the manual workflow only with producer provenance and an explicit actor action.
+自動AI抽出、自動Candidate（候補）作成、自動昇格、バックグラウンド照合はv0.2の外である。AI作成提案は、生成器来歴と明示アクター操作を伴ってのみ手動ワークフローに入れる。
 
-## 15. Context contract
+## 15. Context契約
 
-`context.build` automatically runs authorized lexical retrieval when called. A
-fully integrated host calls it before every user turn; relying on a model to
-choose a memory tool is degraded operation. The v0.2 service provides the
-Context Builder contract but does not provide universal host hooks or MCP.
+`context.build`は呼び出し時に認可済み語彙検索を自動実行する。完全統合ホストは毎ユーザー発話の前に呼び出す。モデルに記憶ツール選択を頼るのは縮退運用である。v0.2サービスはContext Builder契約を提供するが、汎用ホストフックやMCPは提供しない。
 
-Context Packs contain:
+Context Pack（コンテキストパック）は次を含む。
 
-1. `core`: selected accepted high-impact context;
-2. `continuity`: a heuristic selection of active-project and open-loop Canon,
-   plus recent session- or workspace-matching Evidence when routing labels are
-   supplied;
-3. `relevant`: automatically retrieved Canon, Claim, Evidence, or retained
-   textual-representation snippets;
-4. `evidence_handles`: authorized references for separately controlled
-   expansion.
+1. `core`: 選別した承認済み高影響文脈。
+2. `continuity`: 実働プロジェクトと未完了ループのCanonを経験則で選び、経路指定時は直近セッション・作業域一致Evidenceも加える。
+3. `relevant`: 自動検索したCanon、Claim、Evidence、保持テキスト表現断片。
+4. `evidence_handles`: 別途制御された展開のための認可済み参照。
 
-The v0.2 reference's authenticated server profile supplies maximum sensitivity
-and one global set of character budgets for all authenticated requests. A full
-deployment MAY maintain distinct profiles per client. Defaults are:
+v0.2リファレンスの認証済みサーバープロファイルは、最大感度と全認証要求共通の文字数予算一式を与える。フル配置はクライアント別プロファイルを保持してもよい（MAY）。既定は次のとおりである。
 
 ```text
 budget_chars      24000
@@ -533,11 +380,9 @@ continuity_chars   4000
 relevant_chars    12000
 ```
 
-The server reduces layer budgets as needed so their sum does not exceed the
-applied total. Request values can only reduce server limits. Authorization is
-applied before ranking, snippet creation, and expansion.
+サーバーは層予算を必要に応じ縮小し、合計が適用総量を超えないようにする。要求値はサーバー上限を狭めることしかできない。認可は順位付け、断片作成、展開の前に適用する。
 
-Every Context Pack reports:
+すべてのContext Pack（コンテキストパック）は次を報告する。
 
 ```json
 {
@@ -549,178 +394,102 @@ Every Context Pack reports:
 }
 ```
 
-A dirty or lagging projection is rebuilt before use when possible; otherwise the
-pack states that retrieval is degraded. Rendered snippets use escaped,
-unambiguous untrusted-data delimiters. Retrieved material cannot grant tool or
-secret access or override host instructions. Full details are in
-`docs/context-protocol.md`.
+遅延または不一致の投影は可能なら使用前に再構築し、そうでなければ取得低下をパック内で述べる。描画断片はエスケープ済みで曖昧さのないuntrusted-data区切りを使う。検索資料はツールや秘密への到達を与えず、ホスト指示を上書きしない。詳細は`docs/context-protocol.md`にある。
 
-## 16. Runtime projections
+## 16. ランタイム投影
 
-Runtime systems may include SQLite lexical indexes, effective Evidence views,
-transaction catalogs, and caches. Every projection declares the durable schema
-versions and highest durable event sequence it includes.
+ランタイム系はSQLite語彙索引、実効Evidenceビュー、トランザクション目録、キャッシュを含み得る。各投影は対応durableスキーマ版と取込み済み最高durableイベント連番を宣言する。
 
-Rebuild indexes Canon prose and structured Claims, readable capture payloads,
-and retained textual representations. It must work without the models that
-created durable representations. A write marks the relevant projection dirty.
+再構築はCanon散文と構造化Claim、可読取得ペイロード、保持テキスト表現物に索引を付ける。durable表現物を作ったモデルなしに動作するものとする。書き込みは関連投影を汚す。
 
-Deleting all of `runtime/` followed by rebuild MUST preserve accepted knowledge,
-event order, searchability, and authorization behavior.
+`runtime/`全体の削除後に再構築すれば、承認済み知識、イベント順序、検索可能性、認可動作を保持しなければならない（MUST）。
 
-The reference CLI exposes `lifedb runtime reset --confirm DELETE-RUNTIME` for
-this disposable-state deletion. It is an explicit guarded operation, targets
-only the initialized vault's `runtime/`, and MUST be run with the server stopped
-to avoid concurrent writers. It refuses filesystem roots, home/repository
-roots, symlinked or non-directory targets, and uninitialized vaults.
+リファレンスCLIはこの使い捨て状態削除のため`lifedb runtime reset --confirm DELETE-RUNTIME`を公開する。これは明示的で保護された操作であり、初期化済み保管庫の`runtime/`のみを対象とし、同時書き手を避けるためサーバー停止中に実行しなければならない（MUST）。ファイルシステムルート、ホーム・リポジトリルート、シンボリックリンクまたは非ディレクトリ対象、未初期化保管庫は拒否する。
 
-The reference SQLite projection includes structured `concepts`, `claims`,
-`claim_evidence`, and `claim_edges` tables. They preserve queryable graph-shaped
-relationships during rebuild, but the v0.2 API does not expose graph traversal,
-graph ranking, or graph search. Vector stores, embeddings, and learned rerankers
-are not part of v0.2 conformance and are not implemented by the reference
-software.
+リファレンスSQLite投影は構造化`concepts`、`claims`、`claim_evidence`、`claim_edges`表を含む。再構築中も問い合わせ可能なグラフ状関係を保持するが、v0.2 APIはグラフ横断、グラフランク付け、グラフ検索を公開しない。ベクトルストア、埋め込み、学習型リランカーはv0.2適合の一部ではなく、リファレンスソフトウェアも実装しない。
 
-These SQLite tables are implemented projections, not an unimplemented graph
-feature. Consumers that need graph traversal or ranking must build that behavior
-above the exposed structured tables.
+これらSQLite表は実装済み投影であり、未実装グラフ機能ではない。グラフ横断や順位付けを要するコンシューマーは、公開された構造化表の上で自ら構築するものとする。
 
-## 17. Authorization and deployment
+## 17. 認可と配置
 
-The reference HTTP server authenticates every `/v1/*` request with
-`Authorization: Bearer ...` using `LIFEDB_API_TOKEN`. The token MUST be supplied
-through the process environment or an external secret mechanism and MUST NOT be
-written to the vault. `/health` is the only unauthenticated endpoint.
+リファレンスHTTPサーバーは、`LIFEDB_API_TOKEN`を用いた`Authorization: Bearer ...`ですべての`/v1/*`要求を認証する。トークンは処理環境または外部秘密機構で与えなければならず（MUST）、保管庫に書いてはならない（MUST NOT）。`/health`のみが無認証端点である。
 
-`LIFEDB_SENSITIVITY_CEILING` sets the server-profile maximum and defaults to
-`personal`. A request sensitivity value only narrows that maximum. `client` and
-`actor` strings supplied in request bodies are labels, not authentication.
-`LIFEDB_INGEST_SENSITIVITY_FLOOR` sets the minimum sensitivity for HTTP capture;
-the caller may raise it but cannot lower it. Context budgets are additionally
-bounded by the validated durable context policy.
+`LIFEDB_SENSITIVITY_CEILING`はサーバープロファイル最大値を定め、既定は`personal`である。要求感度値はその最大値を狭めるだけである。要求本文の`client`と`actor`文字列は表示名であり、認証ではない。`LIFEDB_INGEST_SENSITIVITY_FLOOR`はHTTP取得の最小感度を定め、呼び出し側は引き上げられても引き下げはできない。Context予算も検証済みdurableコンテキストポリシーでさらに制限する。
 
-The default deployment binds only to localhost. Authentication is still required
-because other local processes are not automatically trusted. Remote exposure
-requires an approved TLS endpoint, reverse proxy, destination policy, rate and
-quota controls, free-space monitoring, and an explicit destination-disclosure
-review. The reference has a single owner Bearer token and does not provide
-operation-level scopes within that token; it does not enforce per-source quotas,
-request rates, or free-space thresholds.
+既定配置はlocalhostにのみ束縛する。それでも他のローカル処理が自動的に信頼されるわけではないため、認証は依然必要である。外部公開には承認済みTLS端点、リバースプロキシ、宛先ポリシー、レートと割当管理、空き容量監視、明示的な宛先開示審査が必要である。リファレンスは所有者Bearerトークンを一つだけ持ち、その中で操作範囲を分けない。情報源別割当、要求レート、空き容量しきい値は強制しない。
 
-Docker is replaceable. The vault is bind-mounted from a host-visible backed-up
-path; durable data MUST NOT exist only in a container layer or anonymous volume.
+Dockerは置換可能である。保管庫はホスト可視でバックアップ済みのパスからバインドマウントする。durableデータをコンテナ層や無名ボリュームだけに置いてはならない（MUST NOT）。
 
-## 18. Retention and owner erasure
+## 18. 保持と所有者消去
 
-The reference CLI implements ordinary retention as a manual two-phase operation:
+リファレンスCLIは通常保持を手動二段階操作で実装する。
 
-1. `preview` resolves exact objects, current typed Claim requirements, holds,
-   representations, policy version, affected Evidence, and estimated bytes;
-2. `apply` requires explicit confirmation of that exact preview and revalidates
-   it under the writer lock before changing anything.
+1. `preview`は厳密な対象オブジェクト、現行型付きClaim要件、拘束、表現物、ポリシー版、影響Evidence、推定バイト列を解決する。
+2. `apply`はその厳密プレビューへの明示確認を要し、変更前に書き手ロック下で再検証する。
 
-There is no scheduled or automatic apply in v0.2. A stale preview fails closed.
-Successful lifecycle changes append immutable events and dirty runtime
-projections.
+v0.2に定時または自動の適用はない。古いプレビューは安全側に失敗する。成功したライフサイクル変更は不変イベントを追記し、ランタイム投影を汚す。
 
-The available commands are `lifedb retention preview`,
+利用可能コマンドは`lifedb retention preview`、
 `lifedb retention apply <plan-id> --confirm 'sha256:<confirmation>' --actor
-<actor>`, and `lifedb retention recover`. Preview and recover are executable
-commands; apply requires the exact confirmation returned by that preview.
+<actor>`、`lifedb retention recover`である。プレビューと回復は実行可能コマンドであり、適用はそのプレビューが返した厳密確認を要する。
 
-Owner-authorized erasure is separate from retention eviction. It requires strong
-owner authorization, a complete impact preview, exact confirmation, and
-traversal of captures, events, raw objects, representations, Canon snapshots,
-and runtime copies in scope. It may intentionally make as-of history or rollback
-incomplete.
+所有者承認の消去は保持退避と別である。強固な所有者認可、完全な影響プレビュー、厳密確認、範囲内の取得記録、イベント、rawオブジェクト、表現物、Canonスナップショット、ランタイム複製の走査を要する。時点履歴やロールバックを意図的に不完全にすることがある。
 
-LifeDB reports known backup impact but cannot erase offline or provider-managed
-backups itself. Backup inventory, expiry, deletion, and preventing restoration of
-erased data remain deployment-operator responsibilities.
+LifeDBは既知バックアップ影響を報告するが、オフラインや事業者管理バックアップ自体は消去できない。バックアップ在庫、有効期限、削除、消去済みデータの復元防止は配置運用者の責務のままである。
 
-The durable backup set is `vault.json`, `canon/`, `evidence/`, `objects/`,
-`policies/`, `schemas/`, and `migrations/`. While a retention transaction is
-prepared or in flight, `quarantine/` is also required in the consistent backup
-set. `runtime/` is disposable and is rebuilt rather than backed up.
+durableバックアップ一式は`vault.json`、`canon/`、`evidence/`、`objects/`、`policies/`、`schemas/`、`migrations/`である。保持トランザクションの準備済みまたは実行中は、無矛盾バックアップ一式に`quarantine/`も要る。`runtime/`は使い捨てのため、バックアップせず再構築する。
 
-## 19. Versioning and migration
+## 19. 版管理と移行
 
-Readers accept v0.1 durable records only through documented compatibility paths.
-Writers emit v0.2. Migration is append-only or works on a verified copy before
-replacement and includes:
+読み手はv0.1 durable記録を文書化互換経路でのみ受け入れる。書き手はv0.2を出す。移行は追記専用か、置換前に検証済み複製上で作業し、次を含む。
 
-1. source and target schema identifiers;
-2. deterministic migration code where possible;
-3. rollback instructions;
-4. fixtures from the previous format;
-5. unknown-field round-trip tests;
-6. disaster-recovery tests.
+1. 由来と対象のスキーマ識別子。
+2. 可能な限り決定論的移行符号。
+3. ロールバック手順。
+4. 旧形式のfixture。
+5. 未知フィールド往復試験。
+6. 災害復旧試験。
 
-Specific compatibility rules include:
+個別互換規則は次のとおりである。
 
-- a v0.1 bare Claim Evidence UUID becomes `{id: <uuid>, requires: raw}`;
-- a v0.1 sealed Evidence record is a legacy capture; later changes are v0.2
-  events rather than edits;
-- a v0.2 `reference-only` capture requires a URI and has no stored payload
-  object;
-- existing Canon content receives a baseline snapshot before managed changes.
+- v0.1の素のClaim Evidence UUIDは`{id: <uuid>, requires: raw}`になる。
+- v0.1封印済みEvidence記録は旧来取得記録であり、後の変更は編集ではなくv0.2イベントである。
+- v0.2 `reference-only`取得はURIを要し、格納ペイロードオブジェクトを持たない。
+- 既存Canon内容は管理変更の前に基準スナップショットを受ける。
 
-## 20. v0.2 scope and conformance
+## 20. v0.2範囲と適合性
 
-The v0.2 executable core includes durable capture and lifecycle events, manual
-Candidate reconciliation, transactional Canon mutation and rollback, explicit
-ordinary-retention preview/apply/recovery, lexical and structured SQLite
-rebuild, server-authorized Context Packs, and disaster recovery. Owner-erasure
-semantics are specified in this document but owner-erasure preview/apply is not
-implemented by the reference software.
+v0.2実行コアは、durable取得とライフサイクルイベント、手動Candidate（候補）照合、トランザクションCanon変更とロールバック、明示的通常保持プレビュー・適用・回復、語彙・構造化SQLite再構築、サーバー認可Context Pack（コンテキストパック）、災害復旧を含む。所有者消去意味は本文書で規定するが、所有者消去プレビュー・適用はリファレンスソフトウェアが実装しない。
 
-A conforming v0.2 vault and implementation satisfy all of the following:
+適合v0.2保管庫と実装はすべて次を満たす。
 
-1. vault, Canon, Capture, Event, and Context data validate against their v0.2
-   schemas while preserving unknown fields;
-2. Canon is a valid LifeDB profile of OKF v0.2 and stable UUIDs are unique;
-3. capture and event integrity values verify, event sequences are valid, and
-   effective Evidence folds deterministically;
-4. present raw and representation objects exist and match their paths, while
-   valid reference-only captures intentionally have no object;
-5. active Claim semantic references and typed Evidence requirements resolve;
-6. Canon mutation uses prepared/committed snapshots and rollback produces a new
-   transaction;
-7. runtime deletion followed by rebuild reaches the reported durable watermark
-   and can search Canon Claims, readable Evidence, and retained textual
-   representations;
-8. HTTP authorization, server-side sensitivity limits, Context character
-   budgets, and untrusted-content boundaries are enforced;
-9. ordinary retention never applies without a fresh preview and exact explicit
-   confirmation; an implementation that adds owner erasure MUST provide the
-   same preview-bound protection;
-10. no required durable data exists only in Docker-managed or runtime state.
+1. 保管庫、Canon、取得記録、イベント、Contextデータはv0.2スキーマに対して検証し、未知フィールドを保持する。
+2. CanonはOKF v0.2のLifeDBプロファイルとして有効であり、安定UUIDは一意である。
+3. 取得記録とイベントの完全性値が検証され、イベント連番が有効であり、実効Evidence畳み込みが決定論的である。
+4. 存在するrawと表現物オブジェクトはパスと一致し、有効な参照限定取得は意図的にオブジェクトを持たない。
+5. 現行Claimの意味参照と型付きEvidence要件は解決する。
+6. Canon変更は準備済み・確定済みスナップショットを使い、ロールバックは新規トランザクションを作る。
+7. ランタイム削除後の再構築は報告済みdurableウォーターマークに到達し、Canon Claim、可読Evidence、保持テキスト表現物を検索できる。
+8. HTTP認可、サーバー側感度上限、Context文字数予算、信頼不可内容境界を強制する。
+9. 通常保持は新規プレビューと厳密明示確認なしに適用されることはない。所有者消去を追加する実装は、同一のプレビュー束縛保護を与えなければならない（MUST）。
+10. 必要なdurableデータがDocker管理またはランタイム状態だけに存在することはない。
 
-The reference software does **not** implement owner-erasure preview/apply, MCP,
-vector search, graph traversal or ranking, external collectors, OCR or
-transcription pipelines, automatic host preflight/postflight hooks, scheduled
-retention apply, or automatic AI extraction and promotion. These features are
-outside v0.2 conformance; their presence MUST NOT be implied by a claim that an
-installation is v0.2 conformant.
+リファレンスソフトウェアは、所有者消去プレビュー・適用、MCP、ベクトル検索、グラフ横断・順位付け、外部収集器、OCR・書き起こし処理、自動ホストpreflight/postflightフック、定期保持適用、自動AI抽出・昇格を実装**しない**。これら機能はv0.2適合の外であり、v0.2適合の設置だという主張から存在を推定してはならない（MUST NOT）。
 
-## 21. Resource ceilings and reference scale
+## 21. 資源上限とリファレンス規模
 
-The reference implementation applies these input and projection ceilings:
+リファレンス実装は次の入力・投影上限を適用する。
 
-| Area | Limit |
+| 領域 | 上限 |
 | --- | ---: |
-| HTTP request body and CLI raw input | 64 MiB |
-| Durable capture/event record | 16 MiB |
-| Canon Markdown and indexed text object | 8 MiB |
-| Canon YAML frontmatter, CLI mapping, policy, and source metadata | 1 MiB each |
-| Installed/vault JSON Schemas | no independent cap; treated as trusted schema input |
-| Event `data` member | 4 MiB |
-| Context layer defaults (`budget/core/continuity/relevant`) | 24,000 / 8,000 / 4,000 / 12,000 chars |
-| Context object and Evidence expansion | 1,000,000 chars |
-| Search query / result count | 4,096 chars / 100 |
+| HTTP要求本文とCLI raw入力 | 64 MiB |
+| durable取得・イベント記録 | 16 MiB |
+| Canon Markdownと索引対象テキストオブジェクト | 8 MiB |
+| Canon YAMLフロントマター、CLIマッピング、ポリシー、情報源メタデータ | 各1 MiB |
+| 導入・保管庫JSONスキーマ（スキーマ検証入力） | 4 MiB |
+| イベント`data`メンバ | 4 MiB |
+| Context層既定（`budget/core/continuity/relevant`） | 24,000 / 8,000 / 4,000 / 12,000 chars |
+| ContextオブジェクトとEvidence展開 | 1,000,000 chars |
+| 検索クエリ・結果件数 | 4,096 chars / 100 |
 
-The YAML loader additionally limits aliases to 50, nesting depth to 64, and
-composed/expanded nodes to 100,000. These ceilings bound resource use; they are
-not throughput guarantees. Event append and source external-ID lookup scan the
-durable record set in O(N), and the reference assumes one durable writer at a
-time. The runtime index is disposable and rebuilt from durable files.
+YAML読込はさらに別名を50、深さを64、合成・展開ノードを100,000に制限する。これら上限は資源利用を抑えるものであり、処理能力保証ではない。イベント追記と情報源外部ID照会はdurable記録集合をO(N)で走査し、リファレンスは一度に1つのdurable書き手を想定する。ランタイム索引は使い捨てであり、durableファイルから再構築する。

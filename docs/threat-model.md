@@ -1,195 +1,126 @@
-# LifeDB Threat Model
+# LifeDB脅威モデル
 
-Status: v0.2 design baseline
+状態: v0.2設計ベースライン
 
-## Scope and security posture
+## 適用範囲とセキュリティ姿勢
 
-LifeDB contains a longitudinal record of a person's activities, relationships,
-interests, decisions, and inferred traits. Metadata alone may be highly
-sensitive. The v0.2 core therefore assumes least disclosure even on a local
-machine.
+LifeDBは、個人の活動、関係、関心、決定、推定特性の長期記録を含む。メタデータだけでも高度に機密性が高い。したがってv0.2中核は、ローカルマシン上であっても最小開示を前提とする。
 
-The v0.2 deployment model is one owner, one vault, and one durable writer at a
-time. Multiple authenticated readers may use runtime projections. Multi-owner,
-multi-writer, federated, and hostile-host operation are outside this threat
-model. The reference HTTP service uses one owner Bearer token with no
-operation-level scope separation.
+v0.2配置モデルは、所有者1人、保管庫1つ、durableライター同時1つである。複数の認証済み読者がランタイム投影を利用できる。複数所有者、複数ライター、連合、敵対ホスト運用は本脅威モデルの対象外である。リファレンスHTTPサービスは、操作層スコープ分離のない1つの所有者Bearerトークンを使う。
 
-The host operating system administrator and the authenticated vault owner are
-trusted to authorize administrative operations. Source content, collectors,
-agent clients, remote model providers, plugins, and other local processes are
-not inherently trusted.
+ホストOS管理者と認証済み保管庫所有者は、管理操作の承認者として信頼する。same-UIDローカルプロセスとホスト管理者（root）は、リファレンスサーバーの隔離境界外である。いずれもBearerトークン、保管庫ファイル、プロセスメモリを読めるため、localhostとBearerトークンの組合せはそれらのアクターに対抗できない。それらは配置上の信頼前提であり、防御対象の敵対者ではない。ソース内容、収集器、エージェントクライアント、リモートモデルプロバイダー、プラグイン、その他ローカルプロセスは、本来的に信頼しない。
 
-## Assets
+## 資産
 
-LifeDB protects:
+LifeDBは以下を保護する。
 
-- Canon content and its change history;
-- Evidence records and source metadata;
-- raw objects and derived representations;
-- identities, relationships, locations, schedules, habits, and inferences;
-- policies, sensitivity labels, holds, and erasure decisions;
-- Context queries, Context Packs, session and workspace associations;
-- audit actors, lifecycle events, and Canon transactions;
-- backup copies and encryption keys managed outside the vault.
+- Canon（カノン）内容とその変更履歴。
+- Evidence（証跡）記録とソースメタデータ。
+- rawオブジェクトと派生表現物。
+- アイデンティティ、関係、位置、日程、習慣、推定。
+- ポリシー、感度ラベル、ホールド、消去決定。
+- Context問合せ、Context Pack（コンテキストパック）、セッション・ワークスペース関連付け。
+- 監査アクター、ライフサイクルイベント、Canonトランザクション。
+- 保管庫外で管理するバックアップ複製と暗号鍵。
 
-Object hashes, perceptual hashes, filenames, sizes, timestamps, and source URIs
-are metadata assets. A hash may reveal equality or permit guessing of
-low-entropy content even when payload bytes are unavailable.
+オブジェクトハッシュ、知覚ハッシュ、ファイル名、サイズ、タイムスタンプ、ソースURIはメタデータ資産である。ペイロードバイト列が利用できなくても、ハッシュは等価性を露呈し、あるいは低エントロピー内容の推測を許し得る。
 
-## Trust boundaries
+## 信頼境界
 
-### Source and collector to Evidence and Objects
+### ソース・収集器からEvidence（証跡）・Objectsへ
 
-Imported files, web pages, messages, transcripts, and collector events are
-untrusted input. In the v0.2 reference, capture writes the sealed Evidence
-record and (when retained) the Object directly; `quarantine/` is retention-
-transaction staging. A future passive collector MAY first stage input in a
-capture quarantine before validation. In all cases, input may contain malware,
-malformed encodings, secrets, decompression bombs, false metadata, or
-instructions intended to manipulate an agent.
+導入ファイル、ウェブページ、メッセージ、記録、収集器イベントは信頼できない入力である。v0.2リファレンスでは、取得は封印済みEvidence（証跡）記録と（保持する場合は）オブジェクトを直接書き込む。`quarantine/`は保持トランザクションのステージングである。将来の受動収集器は、検証前に取得隔離へ入力をまず置くことができる（MAY）。いずれの場合も、入力はマルウェア、不正エンコーディング、秘密、展開爆弾、偽メタデータ、エージェント操作狙いの指示を含み得る。
 
-### Client to LifeDB service
+### クライアントからLifeDBサービスへ
 
-A client identity, claimed sensitivity ceiling, source label, or actor name in a
-request is not trusted merely because the request came from localhost. A full
-deployment authenticates the principal and derives authority from server-side
-policy. The reference authenticates one owner Bearer token and applies its
-server-configured sensitivity and budget limits; request labels do not add
-authority.
+要求中のクライアント身元、申告感度上限、ソースラベル、アクター名は、localhostからの要求というだけでは信頼しない。本番配置はプリンシパルを認証し、サーバー側ポリシーから権限を導出する。リファレンスは1つの所有者Bearerトークンを認証し、サーバー設定の感度・予算上限を適用する。要求ラベルは権限を付加しない。
 
-### Durable stores to runtime projections
+### durableストアからランタイム投影へ
 
-Indexes and Context Packs are derived copies. They must preserve authorization
-and sensitivity boundaries and must expose their durable revision. A stale or
-partial projection must report that condition rather than silently claiming a
-complete search.
+索引とContext Pack（コンテキストパック）は派生複製である。認可と感度の境界を保ち、durableリビジョンを公開しなければならない。陳腐または部分的な投影は、完全検索を称するのではなく、その状態を報告しなければならない。
 
-### LifeDB to a model or agent host
+### LifeDBからモデル・エージェントホストへ
 
-Sending context to a local model, remote model, plugin, or tool is a disclosure.
-In a full deployment, destination and purpose are inputs to authorization.
-`restricted` material must never leave an approved local execution boundary.
-The reference records server-fixed destination and purpose labels but does not
-enforce destination/purpose allowlists or remote-egress policy.
+ローカルモデル、リモートモデル、プラグイン、ツールへのコンテキスト送信は開示である。本番配置では、宛先と目的が認可入力である。`restricted`資料は承認済みローカル実行境界から出してはならない。リファレンスはサーバー固定の宛先・目的ラベルを記録するが、宛先・目的許可リストや外部送出ポリシーを強制しない。
 
-### Live vault to backup and restore
+### 稼働保管庫からバックアップ・復元へ
 
-Backups cross an administrative and temporal boundary. They need encryption,
-integrity verification, retention limits, restoration drills, and an erasure
-propagation policy. A live-store deletion alone is not complete erasure.
+バックアップは管理・時間境界を越える。暗号化、完全性検証、保持期限、復元訓練、消去波及ポリシーが必要である。稼働ストア削除だけでは完全消去にならない。
 
-## Security goals
+## セキュリティ目標
 
-LifeDB aims to provide:
+LifeDBは以下を提供する。
 
-- confidentiality through authenticated, purpose-bound, server-side access
-  control;
-- integrity through atomic writes, schema and graph validation, digests, and
-  append-only normal history;
-- availability through bounded inputs, consistent backups, and empty-runtime
-  rebuilds; deployment-level quotas and free-space controls remain required;
-- accountability through server-assigned actors and durable transactions;
-- owner agency through previews, holds, retention control, and authorized
-  erasure;
-- safe agent use through explicit untrusted-content boundaries.
+- 認証済み、目的拘束、サーバー側アクセス制御による機密性。
+- 不可分書込み、スキーマ・グラフ検証、ダイジェスト、通常追記専用履歴による完全性。
+- 入力上限、一貫バックアップ、空ランタイム再構築による可用性。配置層の割当と空き容量管理は依然必要である。
+- サーバー割当てアクターとdurableトランザクションによる説明責任。
+- プレビュー、ホールド、保持管理、承認済み消去による所有者主体性。
+- 明示的信頼不可内容境界による安全なエージェント利用。
 
-LifeDB does not claim that a digest authenticates a source, that a sealed record
-is physically impossible to alter, or that an inference becomes true because it
-appears in Canon.
+LifeDBは、ダイジェストが情報源を認証すること、封印済み記録が物理的に改変不能であること、Canon（カノン）に現れた推定が真実になることを主張しない。SHA-256記録・オブジェクトハッシュは変更検出とバイト同一性検査のみであり、署名や情報源真正性には決してならない。
 
-## Threats and normative full-deployment controls
+ランタイム索引向けセキュリティ上重要なファイルディスクリプタ検証は、Linuxの`/proc/self/fd`経由で既開記述子に固定し、その機能が利用不可または使用不能な場合は、パス解決データベースへの後退ではなく操作を拒否してフェールクローズする。
 
-The table below states the controls required by the full threat-model design.
-The v0.2 reference implements only the subset called out in its reference
-qualification text and in the authorization section below.
+## 脅威と規範的完全配置管理策
 
-| Threat | Consequence | Required control |
+下表は、本脅威モデル設計が求める管理策を述べる。v0.2リファレンスは、リファレンス限定文と下記認可節で明示する部分集合のみ実装する。
+
+| 脅威 | 結果 | 必要管理策 |
 | --- | --- | --- |
-| Unauthenticated local client | Reads or writes personal data | Authenticate every non-health operation; prefer a permission-restricted Unix socket or equivalent local credential |
-| Caller raises its own sensitivity ceiling | Unauthorized disclosure | Resolve maximum sensitivity and permitted destinations from server-side client policy; request values may only narrow access |
-| Direct Evidence or object lookup bypasses search filtering | Record or metadata disclosure | Apply the same policy to lookup, expansion, search, and context; do not expose objects by digest without an authorized reference |
-| Claim-level sensitivity inside a lower-sensitivity document | Whole-document leakage | Enforce the maximum effective label for any returned fragment, or split material into separately authorized documents |
-| Malicious prompt text in Evidence or Canon | Tool misuse, exfiltration, or memory poisoning | Render retrieved text in explicit data boundaries; never treat it as host instructions or permission; keep promotion separate from ingestion |
-| Compromised collector or spoofed source metadata | False or poisoned observations | Assign producer identity server-side, retain acquisition provenance, support idempotency and replay detection, and treat source assertions as unverified |
-| Hash mistaken for authenticity | False confidence in origin | Describe hashes only as byte-integrity and addressing mechanisms; use authenticated acquisition or signatures when authenticity is required |
-| Torn or reordered filesystem writes | Sealed partial records or dangling references | Stage, flush, atomically publish, fsync directories, serialize durable writers, and provide deterministic crash recovery |
-| Out-of-band Canon edit | History bypass and irreproducible current state | Detect snapshot hash drift; keep valid live edits searchable, and flag the drift for owner review and (when audited history is required) adoption through a Canon transaction |
-| Runtime index is stale or incomplete | Relevant memory is silently omitted | Track a durable sequence watermark and indexed schema versions; report degraded or stale status in search and Context Packs |
-| Raw payload is evicted despite a Claim dependency | Loss of supporting material | Resolve typed Claim evidence requirements and all holds immediately before deletion under the writer lock |
-| Deduplicated object has references with different policies | Premature deletion or label confusion | Compute effective retention and access across all current references; keep labels and holds on references, not in the filename |
-| Passive or adversarial ingestion floods storage | Denial of service and backup failure | Enforce request-size in LifeDB; deployment collectors/reverse proxies must add source quota, rate, grace-period, and free-space thresholds before capture (the reference does not enforce per-source quota, rate, or free-space limits) |
-| Secret appears in a file, message, or screenshot | Credential compromise | Do not promise perfect detection; apply deployment-specific capture staging/redaction, support owner erasure, and prohibit deliberate credential storage (the reference captures directly to Evidence/Objects and has no passive-collector quarantine) |
-| Backup theft or stale backup retention | Long-lived confidentiality loss | Require encrypted backups, separate key custody, retention schedules, inventory, integrity checks, and tested erasure propagation |
-| Remote model receives over-broad context | Third-party disclosure | Authorize by destination and purpose, minimize context, prohibit `restricted` egress, and avoid persistent request logging; require TLS and a reviewed reverse proxy for remote exposure |
-| Owner requests deletion but derivatives remain | Incomplete erasure | Preview and traverse Evidence, raw objects, representations, Canon snapshots, runtime copies, and known backups before completion |
-| Ransomware, disk loss, or bad migration | Loss or corruption of memory | Maintain versioned backups, hash manifests, migration copies, rollback instructions, and restore drills on an independent environment |
+| 未認証ローカルクライアント | 個人データの読書き | 非ヘルス操作をすべて認証する。権限制限Unixソケットまたは等価ローカル資格情報を選ぶ |
+| 呼出者が自ら感度上限を引上げ | 未認可開示 | 最大感度と許可宛先をサーバー側クライアントポリシーから解決する。要求値はアクセスを狭めることのみできる |
+| 検索選別を迂回するEvidence（証跡）・オブジェクト直接照会 | 記録またはメタデータ開示 | 照会、展開、検索、コンテキストに同一ポリシーを適用する。認可参照なしにダイジェストでオブジェクトを公開しない |
+| 低感度文書内のClaim（主張）層感度 | 文書全体漏えい | 返却断片に最大実効ラベルを強制する。または資料を個別認可文書に分割する |
+| Evidence（証跡）・Canon（カノン）内の悪意プロンプト文 | ツール悪用、持出し、記憶汚染 | 取得文を明示データ境界内に描画する。ホスト指示または権限として扱わない。昇格を取込みから分離したままにする |
+| 侵害収集器または詐称ソースメタデータ | 偽または汚染観測 | 生成者身元をサーバー側で割当て、取得来歴を保持し、べき等性と再生検出を支え、ソース主張を未検証として扱う |
+| ハッシュを真正性と誤認 | 出所への誤った信頼 | ハッシュをバイト完全性・アドレス指定機構としてのみ説明する。真正性が必要な場合は認証取得または署名を使う |
+| 断裂・順序崩壊ファイルシステム書込み | 封印済み部分記録または宙ぶらりん参照 | ステージング、フラッシュ、不可分公開、ディレクトリfsync、durableライター直列化、決定論的クラッシュ復旧を提供する |
+| 帯域外Canon（カノン）編集 | 履歴迂回と再現不能現行状態 | スナップショットハッシュのずれを検出する。有効な稼働編集は検索可能に保ち、所有者レビューと（監査履歴が必要な場合は）Canonトランザクションによる取込みに向けて漂動に印を付ける |
+| 陳腐・不完全ランタイム索引 | 関連記憶の黙示省略 | durable順序ウォーターマークと索引済みスキーマ版を追跡する。検索とContext Pack（コンテキストパック）で低下・陳腐状態を報告する |
+| Claim（主張）依存があるのにrawペイロード退避 | 裏付け資料喪失 | ライターロック下で削除直前に型付きClaim（主張）証跡要件と全ホールドを解決する |
+| 重複排除オブジェクトが異種ポリシー参照を持つ | 早期削除またはラベル混同 | 現行全参照にわたり実効保持とアクセスを算定する。ラベルとホールドはファイル名ではなく参照上に保つ |
+| 受動・敵対取込みによる格納溢水 | サービス拒否とバックアップ失敗 | LifeDB内で要求サイズを強制する。配置収集器・リバースプロキシは取得前にソース割当、レート、猶予期間、空き容量しきい値を追加しなければならない（リファレンスはソース別割当、レート、空き容量上限を強制しない） |
+| ファイル、メッセージ、スクリーンショット内の秘密 | 資格情報危殆化 | 完全検出を約束しない。配置別の取得時のステージング・墨消しを適用し、所有者消去を支え、意図的資格情報格納を禁じる（リファレンスはEvidence（証跡）・Objectsへ直接取得し、受動収集器隔離を持たない） |
+| バックアップ窃取または陳腐バックアップ保持 | 長期機密性喪失 | 暗号化バックアップ、鍵分離管理、保持計画、在庫管理、完全性検査、試験済み消去波及を要求する |
+| リモートモデルへの過広コンテキスト送信 | 第三者開示 | 宛先・目的別に認可し、コンテキストを最小化し、`restricted`送出を禁じ、永続要求記録を避ける。外部公開にはTLSとレビュー済みリバースプロキシを要求する |
+| 所有者が消去要求するも派生物残留 | 不完全消去 | 完了前にEvidence（証跡）、rawオブジェクト、表現物、Canonスナップショット、ランタイム複製、既知バックアップをプレビュー・走査する |
+| ランサムウェア、ディスク喪失、不良移行 | 記憶喪失・破損 | 版管理バックアップ、ハッシュマニフェスト、移行複製、ロールバック手順、独立環境での復元訓練を維持する |
 
-## Authorization rules for a full deployment
+## 完全配置向け認可規則
 
-The following is the normative profile model for a full or multi-client
-deployment. Every client has a server-managed profile containing at least:
+以下は完全または複数クライアント配置向け規範プロファイルモデルである。すべてのクライアントは、少なくとも以下を含むサーバー管理プロファイルを持つ。
 
-- principal identity;
-- allowed operations;
-- maximum sensitivity;
-- permitted local or remote destinations;
-- whether Evidence expansion is allowed;
-- applicable workspace, session, or purpose restrictions;
-- request and Context Pack budgets.
+- プリンシパル身元。
+- 許可操作。
+- 最大感度。
+- 許可ローカル・リモート宛先。
+- Evidence（証跡）展開可否。
+- 適用ワークスペース、セッション、目的制限。
+- 要求・Context Pack（コンテキストパック）予算。
 
-The effective authorization is the intersection of client policy, data label,
-destination policy, operation, and owner holds. Unknown labels fail closed.
-Supplying `client`, `actor`, or `sensitivity_ceiling` in request data does not
-authenticate those values.
+実効認可は、クライアントポリシー、データラベル、宛先ポリシー、操作、所有者ホールドの積集合である。未知ラベルはフェールクローズする。要求データ中の`client`、`actor`、`sensitivity_ceiling`の提示は、それらの値を認証しない。
 
-The v0.2 reference is narrower: it authenticates one owner Bearer token for all
-authorized HTTP operations, uses server-fixed principal/destination/purpose
-labels, and applies one global server sensitivity and Context-budget profile.
-It has no per-client profiles, operation scopes, or destination/purpose
-allowlists; request labels are not an authority source.
+v0.2リファレンスは狭い。認可済みHTTP操作すべてに1つの所有者Bearerトークンを認証し、サーバー固定プリンシパル・宛先・目的ラベルを使い、1つの全体サーバー感度・Context予算プロファイルを適用する。クライアント別プロファイル、操作スコープ、宛先・目的許可リストを持たない。要求ラベルは権限源ではない。
 
-Object access is mediated through an authorized Evidence or representation
-reference. Content-addressed paths are storage details, not bearer capabilities.
+オブジェクトアクセスは、認可済みEvidence（証跡）または表現物参照を経由する。内容アドレスパスは格納詳細であり、ベアラー能力ではない。
 
-## Context and prompt-injection boundary
+## Contextとプロンプトインジェクションの境界
 
-The Context Builder filters before ranking and renders only authorized items.
-Each item identifies its source, sensitivity, truncation, and untrusted status;
-Canon items may also carry authorized Evidence handles. Freshness and durable
-revision are reported at pack level by the global watermark, not on each item.
-Retrieved text is delimited and described as potentially adversarial.
+Context Builderは順位付け前に選別し、認可済み項目のみ描画する。各項目は情報源、感度、切詰め、信頼不可状態を示す。Canon（カノン）項目は認可済みEvidence（証跡）ハンドルを伴い得る。鮮度とdurableリビジョンは項目別ではなく全体ウォーターマークでパック層報告する。取得文は区切り付きで敵対的可能性ありとして説明する。
 
-Canon Core may contain accepted preferences and constraints, but it cannot grant
-filesystem, network, tool, model, or secret access. Host system policy remains
-above every LifeDB layer. Evidence content never becomes Core merely because it
-contains instruction-like language.
+Canon Coreは承認済み選好・制約を含み得るが、ファイルシステム、ネットワーク、ツール、モデル、秘密へのアクセスを許可できない。ホストシステムポリシーはすべてのLifeDB層の上位に残る。Evidence（証跡）内容は、指示様言語を含むというだけではCoreにならない。
 
-Context Packs are short-lived runtime artifacts. Implementations should avoid
-persisting full queries and rendered packs; any operational logging must be
-minimal, access-controlled, and covered by retention and erasure policy.
+Context Pack（コンテキストパック）は短命ランタイム成果物である。実装は完全問合せと描画済みパックの永続化を避けるべきである。運用記録は最小、アクセス管理、保持・消去ポリシー対象でなければならない。
 
-## Owner-authorized erasure
+## 所有者消去
 
-Erasure is a privileged, destructive exception to normal append-only operation.
-It requires strong owner authentication, exact resolved targets, an impact
-preview, and explicit confirmation. Authorization for retention management does
-not automatically authorize erasure.
+消去は、通常追記専用運用への特権的破壊的例外である。強固な所有者認証、厳密解決対象、影響プレビュー、明示確認を要する。保持管理の認可は消去を自動承認しない。
 
-An erasure traversal includes semantic references, capture records, lifecycle
-events, raw objects, derived representations, Canon transaction snapshots,
-runtime projections, trash windows, and known backup generations. LifeDB must
-state which external or offline copies it cannot control. If the owner requests
-total removal, an audit tombstone must not preserve the removed personal data.
+消去走査は、意味参照、取得記録、ライフサイクルイベント、rawオブジェクト、派生表現物、Canonトランザクションスナップショット、ランタイム投影、ごみ箱期間、既知バックアップ世代を含む。LifeDBは、管理不能な外部・オフライン複製を明示しなければならない。所有者が完全除去を要求する場合、監査墓標は除去個人データを保持してはならない。
 
-## Residual risks and non-goals
+## 残留リスクと非目標
 
-The v0.2 core does not defend against a malicious host administrator with access
-to plaintext memory, an already compromised owner account, hardware key theft,
-traffic analysis outside the host, or copies exported beyond LifeDB's control.
-Application-level encryption, signatures, multi-party authorization, remote
-attestation, and multi-user isolation are future work.
+v0.2中核は以下に対抗しない。トークン、保管庫ファイル、プロセスメモリに到達するsame-UIDローカルプロセス、平文メモリに到達する悪意ホスト管理者、既侵害所有者アカウント、ハードウェア鍵窃取、ホスト外通信解析、LifeDB管理外へ搬出された複製である。アプリケーション層暗号化、署名、多者承認、リモート証明、複数利用者隔離は将来課題である。
 
-Operational deployment therefore requires a maintained host, encrypted storage,
-encrypted off-site backups, restricted filesystem permissions, key separation,
-and periodic restore and access reviews.
+したがって運用配置には、保守済みホスト、暗号化ストレージ、暗号化オフサイトバックアップ、制限ファイルシステム権限、鍵分離、定期的復元・アクセスレビューが必要である。

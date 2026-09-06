@@ -140,9 +140,13 @@ class Vault:
                     raise ValueError("vault root must be a real directory")
                 root_preexisting = True
             except FileNotFoundError:
-                os.mkdir(self.root.name, 0o700, dir_fd=parent_fd)
-                os.fsync(parent_fd)
-                root_preexisting = False
+                try:
+                    os.mkdir(self.root.name, 0o700, dir_fd=parent_fd)
+                except FileExistsError:
+                    root_preexisting = True
+                else:
+                    os.fsync(parent_fd)
+                    root_preexisting = False
             root_fd = os.open(self.root.name, self._init_dir_flags(), dir_fd=parent_fd)
             root_status = os.fstat(root_fd)
             if not stat.S_ISDIR(root_status.st_mode):
@@ -191,10 +195,14 @@ class Vault:
                 try:
                     child_fd = os.open(component, cls._init_dir_flags(), dir_fd=current_fd)
                 except FileNotFoundError:
-                    os.mkdir(component, 0o700, dir_fd=current_fd)
-                    os.fsync(current_fd)
-                    child_fd = os.open(component, cls._init_dir_flags(), dir_fd=current_fd)
-                    os.fchmod(child_fd, 0o700)
+                    try:
+                        os.mkdir(component, 0o700, dir_fd=current_fd)
+                    except FileExistsError:
+                        child_fd = os.open(component, cls._init_dir_flags(), dir_fd=current_fd)
+                    else:
+                        os.fsync(current_fd)
+                        child_fd = os.open(component, cls._init_dir_flags(), dir_fd=current_fd)
+                        os.fchmod(child_fd, 0o700)
                 os.close(current_fd)
                 current_fd = child_fd
             os.fsync(current_fd)
@@ -504,7 +512,7 @@ Vault identity: `{self_id}`
             )
             directories.extend(
                 ("evidence", name)
-                for name in ("conversations", "activity", "web", "mail", "calendar", "git", "imports")
+                for name in ("conversations", "activity", "web", "mail", "calendar", "git", "imports", "_events")
             )
             directories.append(("objects", "sha256"))
             directories.extend(
@@ -526,6 +534,7 @@ Vault identity: `{self_id}`
                 self._publish_bytes_at(
                     root_fd, ("vault.json",),
                     canonical_json_bytes(metadata) + b"\n", mode=0o400,
+                    preserve_existing=True,
                 )
                 # Re-read the committed bytes so a concurrent initializer and
                 # the return value always agree exactly.
@@ -536,7 +545,7 @@ Vault identity: `{self_id}`
             self._install_default_policies(root_fd)
             self._publish_bytes_at(
                 root_fd, ("canon", "index.md"),
-                b"# LifeDB Canon index\n\nThis directory is the durable semantic Canon.\n",
+                b"---\nokf_version: \"0.2\"\n---\n\n# LifeDB Canon index\n\nThis directory is the durable semantic Canon.\n",
                 mode=0o600, preserve_existing=True,
             )
             self._write_initial_core(root_fd, str(metadata["vault_id"]))

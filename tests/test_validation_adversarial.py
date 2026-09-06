@@ -133,6 +133,90 @@ class ValidationAdversarialTest(unittest.TestCase):
             report = validate_vault(self.root)
         self.assertIsNotNone(report)
 
+    def test_manually_edited_canon_credential_material_fails_validation_without_mutation(self) -> None:
+        secret = "ghp_" + "A" * 32
+        cases = {
+            "body": {"front_extra": "", "body": f"Manual note.\nDeployer token: {secret}\n"},
+            "frontmatter": {"front_extra": f'x-note: "review token {secret}"\n', "body": "Manual note.\n"},
+        }
+        for placement, parts in cases.items():
+            with self.subTest(placement=placement):
+                document_id = new_id()
+                path = self.root / "canon" / "self" / f"credential-{placement}.md"
+                path.write_text(
+                    "---\n"
+                    "type: Entity\n"
+                    "title: Manual credential case\n"
+                    f"{parts['front_extra']}"
+                    "x-lifedb:\n"
+                    "  schema: '0.2'\n"
+                    f"  id: {document_id}\n"
+                    "  kind: test\n"
+                    "  sensitivity: personal\n"
+                    "  claims: []\n"
+                    "---\n"
+                    f"{parts['body']}",
+                    encoding="utf-8",
+                )
+                before = path.read_bytes()
+                report = validate_vault(self.root)
+                self.assertFalse(report.valid, report.as_dict())
+                credential_errors = [
+                    error for error in report.errors
+                    if "credential" in error.lower() and "github-token" in error
+                ]
+                self.assertTrue(credential_errors, report.as_dict())
+                self.assertNotIn(secret, " ".join(report.errors))
+                self.assertEqual(path.read_bytes(), before)
+                path.unlink()
+
+    def test_manually_edited_canon_claim_confidence_fails_validation(self) -> None:
+        vault = Vault(self.root)
+        evidence = vault.ingest(
+            b"confidence validation source",
+            source_kind="test",
+            media_type="text/plain",
+            sensitivity="personal",
+        )
+        document_id = new_id()
+        claim_id = new_id()
+        path = self.root / "canon" / "self" / "confidence-manual.md"
+        path.write_text(
+            "---\n"
+            "type: Entity\n"
+            "title: Manual confidence case\n"
+            "x-lifedb:\n"
+            "  schema: '0.2'\n"
+            f"  id: {document_id}\n"
+            "  kind: test\n"
+            "  sensitivity: personal\n"
+            "  claims:\n"
+            f"    - id: {claim_id}\n"
+            f"      subject: {document_id}\n"
+            "      predicate: lifedb.prefers\n"
+            "      object:\n"
+            "        text: fast tools\n"
+            "      statement: Prefers fast tools.\n"
+            "      basis: declared\n"
+            "      certainty: confirmed\n"
+            "      state: active\n"
+            "      observed_at: '2026-09-01T09:00:00+09:00'\n"
+            "      evidence:\n"
+            f"        - id: {evidence['id']}\n"
+            "          requires: raw\n"
+            "      confidence: 0.87\n"
+            "---\n\nManual confidence body.\n",
+            encoding="utf-8",
+        )
+        before = path.read_bytes()
+        report = validate_vault(self.root)
+        self.assertFalse(report.valid, report.as_dict())
+        self.assertTrue(
+            any("confidence" in error for error in report.errors),
+            report.as_dict(),
+        )
+        self.assertEqual(path.read_bytes(), before)
+
 
 if __name__ == "__main__":
     unittest.main()

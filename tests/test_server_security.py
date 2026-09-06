@@ -193,10 +193,7 @@ class LifeDBHTTPTestCase(unittest.TestCase):
             {
                 "query": "ceiling",
                 "client": "display-label",
-                "principal": "self-asserted-admin",
                 "sensitivity_ceiling": "restricted",
-                "destination": "self-asserted-remote",
-                "purpose": "self-asserted-export",
                 "budget_chars": 999_999,
             }
         ).encode()

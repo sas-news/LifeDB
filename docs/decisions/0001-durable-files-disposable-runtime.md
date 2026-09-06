@@ -1,21 +1,18 @@
-# ADR 0001: Durable files and disposable runtime
+# ADR 0001: durableファイルと使い捨てruntime
 
-Status: accepted
+状態: 承認済み
 
-## Decision
+## 決定
 
-LifeDB stores Canon as Markdown with YAML frontmatter, Evidence as immutable
-JSON, and payloads as SHA-256-addressed files. Every database and search index is
-a disposable projection.
+LifeDBは、Canon（カノン）をYAMLフロントマター付きMarkdownで、Evidence（証跡）を不変JSONで、ペイロードをSHA-256アドレスファイルで格納する。すべてのデータベースと検索索引は使い捨て投影である。
 
-Docker bind-mounts the host vault. Docker named or anonymous volumes may be used
-for caches, but never as the only location of durable knowledge.
+Dockerはホスト保管庫をバインドマウントする。Docker名前付き・無名ボリュームはキャッシュに使えるが、durable知識の唯一所在にしてはならない。
 
-## Consequences
+## 結果
 
-- A simple editor can inspect Canon.
-- Evidence can be parsed without the original application.
-- Database-specific features may be added without changing ownership.
-- Rebuild time is accepted as the cost of portability.
-- Schema validation and recovery testing become release requirements.
-- High-volume Evidence must be partitioned or batched to avoid excessive files.
+- 単純な編集器でCanon（カノン）を検査できる。
+- 元アプリケーションなしにEvidence（証跡）を解析できる。
+- 所有権を変えずにデータベース固有機能を追加できる。
+- 再構築時間は可搬性の対価として受容する。
+- スキーマ検証と復旧試験はリリース要件になる。
+- 大量Evidence（証跡）は過剰ファイルを避けるため分割または束ねなければならない。

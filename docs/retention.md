@@ -1,175 +1,127 @@
-# Retention Policy 0.2
+# 保持ポリシー 0.2
 
-Status: v0.2 executable contract
+状態: v0.2実行可能契約
 
-## Retention promise
+## 保持の約束
 
-LifeDB retains observations and payloads according to owner-controlled policy; it
-does not promise indelible storage. During normal operation, capture records and
-lifecycle events are append-only. The owner may explicitly authorize erasure,
-even when that makes history, as-of reconstruction, or rollback incomplete.
+LifeDBは、所有者管理のポリシーに従い観測とペイロードを保持する。消去不能な格納は約束しない。通常運用では、取得記録とライフサイクルイベントは追記専用である。所有者は消去を明示承認でき、履歴、時点再構築、ロールバックが不完全になる場合もある。
 
-For retained Evidence, LifeDB can report:
+保持Evidenceについて、LifeDBは以下を報告できる。
 
-1. what was observed or ingested;
-2. when and from where it came;
-3. what raw and derived objects were recorded;
-4. which current Claims require raw, represented, or record-only support;
-5. whether each required object is currently available;
-6. which policy, actor, and event changed payload state.
+1. 何を観測または取込みしたか。
+2. いつどこから来たか。
+3. どのrawおよび派生オブジェクトを記録したか。
+4. 現行Claim（主張）がraw、表現物、記録のみのいずれの裏付けを要するか。
+5. 要する各オブジェクトが現在利用できるか。
+6. どのポリシー、アクター、イベントがペイロード状態を変えたか。
 
-This does not require every passive capture or reproducible public asset to be
-stored forever.
+受動取得や再現可能公開資産のすべてを永久保存する必要はない。
 
-## Retention classes
+## 保持区分
 
-| Class | Meaning |
+| 区分 | 意味 |
 | --- | --- |
-| `pinned` | Excluded from ordinary eviction previews until an explicit owner or hold change |
-| `durable` | Retained until an explicit, reviewed retention change |
-| `grace` | Eligible for preview only after its declared grace condition |
-| `derivative-only` | Raw bytes may be proposed only after all required durable representations exist |
-| `reference-only` | URI and metadata are retained; the original payload object was never stored |
+| `pinned` | 明示の所有者変更またはホールド変更まで通常退避プレビューから除外する |
+| `durable` | 明示的で審査済みの保持変更まで保持する |
+| `grace` | 宣言済み猶予条件の成立後にのみプレビュー対象となる |
+| `derivative-only` | 要するdurable表現物がすべて存在した後にのみrawバイト列を候補にできる |
+| `reference-only` | URIとメタデータを保持する。当初ペイロードオブジェクトは格納しない |
 
-`reference-only` requires an absolute source URI. Ingestion records content
-size and digest but does not write the supplied original bytes to
-`objects/sha256/`; initial payload state is `external` and `payload.object` is
-absent.
+`reference-only`は絶対情報源URIを要する。取込みは内容量とダイジェストを記録するが、渡された原本バイト列を`objects/sha256/`に書き込まない。初期ペイロード状態は`external`であり、`payload.object`はない。
 
-Suggested defaults are:
+推奨既定値は次のとおり。
 
-| Input | Default |
+| 入力 | 既定値 |
 | --- | --- |
-| Explicit manual ingest | `durable` |
-| User-created or irreplaceable media | `pinned` |
-| Structured text explicitly captured by the owner | `durable` |
-| Reproducible public asset captured only for provenance | `reference-only` or `derivative-only` after review |
-| Generated intermediate with no durable dependency | Runtime or `reference-only` |
+| 明示手動取込み | `durable` |
+| 利用者作成または代替不能媒体 | `pinned` |
+| 所有者が明示取得した構造化文 | `durable` |
+| 来歴のためだけに取得した再現可能公開資産 | 審査後に`reference-only`または`derivative-only` |
+| durable依存のない生成中間物 | Runtimeまたは`reference-only` |
 
-Passive screenshots, continuous audio, external collectors, and automatic
-classification are outside v0.2. A future collector must declare its own quotas,
-grace periods, idempotency behavior, and default sensitivity before deployment.
+受動画面記録、連続音声、外部収集器、自動分類はv0.2の外である。将来収集器は、配置前に自らの割当、猶予期間、べき等動作、既定感度を宣言しなければならない。
 
-## Claim requirements
+## Claim要件
 
-Retention follows the typed edge from a current accepted Claim to Evidence:
+保持は、現行承認済みClaimからEvidenceへの型付き辺に従う。
 
-- `requires: raw` requires the capture payload object to remain present;
-- `requires: representation:<role>` requires at least one verifying durable
-  representation with that exact role;
-- `requires: record-only` requires only the sealed capture record.
+- `requires: raw`は、取得ペイロードオブジェクトが存在し続けることを要する。
+- `requires: representation:<role>`は、そのロールと正確に一致する検証済みdurable表現物が少なくとも一つあることを要する。
+- `requires: record-only`は、封印済み取得記録のみを要する。
 
-A citation is not automatically a raw-byte pin. Conversely, storage pressure
-cannot weaken an explicit requirement. A legacy bare Evidence UUID is treated as
-`requires: raw` until migrated.
+引用は自動的なrawバイト列固定ではない。逆に、格納圧迫は明示要件を緩められない。旧式の素のEvidence UUIDは、移行されるまで`requires: raw`として扱う。
 
-Historical Claim text in a Canon transaction snapshot is not by itself a live
-raw-byte pin. Canon before/after snapshot objects are nevertheless protected
-because they are required for audit and rollback. An archival or legal hold may
-also retain historical Evidence payloads.
+Canonトランザクションスナップショット内の履歴Claim文は、それだけでは有効なrawバイト列固定ではない。それでもCanon前後スナップショットオブジェクトは、監査とロールバックに要するため保護する。保管または法務ホールドも履歴Evidenceペイロードを保持し得る。
 
-## Effective retention for deduplicated objects
+## 重複排除オブジェクトの実効保持
 
-An object digest may be referenced by multiple captures, representations,
-Claims, or transactions with different sensitivities and retention policies.
-LifeDB computes effective retention across all current references before
-proposing that digest.
+一つのオブジェクトダイジェストは、感度や保持ポリシーの異なる複数の取得、表現物、Claim、トランザクションから参照され得る。LifeDBは、そのダイジェストを候補にする前に現行全参照にわたる実効保持を算出する。
 
-The effective decision is the strongest of:
+実効判定は次の最強とする。
 
-- typed requirements from current accepted or disputed Claims;
-- prepared and committed Canon snapshot dependencies;
-- explicit owner, archival, or legal holds;
-- each referencing capture's retention class;
-- durable representation dependencies;
-- policy-specific minimum dates or conditions.
+- 現行承認済みまたは係争中Claimからの型付き要件。
+- 準備済みおよび確定済みCanonトランザクションスナップショット依存。
+- 明示の所有者、保管、法務ホールド。
+- 参照各取得の保持区分。
+- durable表現物依存。
+- ポリシー固有の最小日付または条件。
 
-Deleting one reference never authorizes deletion of shared bytes. Sensitivity
-and authorization also remain attached to references; an object's pathname or
-digest is not a read capability.
+一つの参照削除は、共有バイト列の削除権限にならない。感度と認可も参照に付属する。オブジェクト経路やダイジェストは読取能力ではない。
 
-## Representations
+## 表現物
 
-Representations include extracted text, OCR, speech transcripts, captions,
-thumbnails, perceptual hashes, metadata, and normalized structured records.
-They are added with immutable `representation.added` lifecycle events and record:
+表現物は抽出文、OCR、書き起こし、キャプション、サムネイル、知覚ハッシュ、メタデータ、正規化構造記録を含む。不変`representation.added`ライフサイクルイベントで追加し、以下を記録する。
 
-- a non-empty role;
-- object digest and media type;
-- producer and version;
-- creation time;
-- source object or Evidence derivation.
+- 空でないロール。
+- オブジェクトダイジェストと媒体型。
+- 生成者と版。
+- 作成時刻。
+- 情報源オブジェクトまたはEvidence派生。
 
-The v0.2 core can record and project representations but does not generate OCR,
-captions, or transcripts.
+v0.2中核は表現物を記録・投影できるが、OCR、キャプション、書き起こしは生成しない。
 
-Before proposing raw-byte eviction for `derivative-only`, the service verifies
-that every required role has at least one present, digest-valid durable object.
-After raw eviction, a retained representation is durable Evidence and not a
-recomputable runtime cache.
+`derivative-only`向けrawバイト列退避の候補化に先立ち、サービスは要する各ロールについて、存在しダイジェスト有効なdurableオブジェクトが少なくとも一つあることを検証する。raw退避後も、保持表現物はdurable Evidenceであり、再計算可能なランタイム一時記録ではない。
 
-## Two-phase retention operation (implemented manually)
+## 二段階保持操作（手動実装）
 
-Version 0.2 performs no scheduled or automatic deletion. Every ordinary
-retention change is an explicit two-phase operation.
+版0.2は定時または自動の削除を行わない。通常の保持変更はすべて、明示の二段階操作である。
 
-The reference CLI implements all three manual operations: `preview` writes and
-returns a persisted plan, `apply` performs exact-confirmation eviction after
-revalidation, and `recover` repairs interrupted apply transactions. None of
-these commands runs in the background.
+リファレンスCLIは手動操作を実装する。`preview`は永続化計画を書き出して返し、`apply`は再検証後に厳密確認退避を行い、`recover`は中断適用トランザクションを修復し、`set`は明示の保持区分変更を一つ追記する。これらのコマンドはいずれもバックグラウンドで動かない。
 
-### Preview
+### プレビュー
 
-A preview does not change durable state or remove objects. The reference CLI
-persists it beneath `runtime/retention/` and returns:
+プレビューはdurable状態を変えず、オブジェクトを除去しない。リファレンスCLIは`runtime/retention/<preview-id>.json`配下にJSON文書一つとして永続化し、同内容の情報表示用描画を返す。適用権限は永続化計画文書のみが持つ。`apply`はその厳密文書を再読込し、スキーマ、候補一覧、容量、推定バイト列、確認ダイジェストを検証してから、現行durable状態に照らして再検証する。端末またはAPI描画だけでは適用権限にならず、対応永続化文書なしに描画出力からIDと確認値を写し取っても何も退避できない。計画文書自体は使い捨てランタイム状態であり、durable Evidenceではない。プレビューは以下を返す。
 
-- a unique preview ID and exact `confirmation` digest;
-- generation time and durable event sequence;
-- the SHA-256 digest of the applied policy file;
-- exact object digests and estimated bytes;
-- affected Capture IDs for each candidate;
-- blocked objects with dependency, hold, retention-class, grace-period,
-  representation, snapshot, or missing-object reasons.
+- 一意プレビューIDと厳密`confirmation`ダイジェスト。
+- 生成時刻とdurableイベント連番。
+- 適用ポリシー文書のSHA-256ダイジェスト。
+- 厳密オブジェクトダイジェストと推定バイト列。
+- 候補ごとの影響取得ID。
+- 依存、ホールド、保持区分、猶予期間、表現物、スナップショット、欠落オブジェクトの理由付き阻止オブジェクト。
 
-The preview excludes any object whose current dependencies are not satisfied. A
-preview is not deletion authority.
+プレビューは、現行依存が満たされないオブジェクトを除外する。プレビューは削除権限ではなく、所有者消去権限でもない。通常保持は取得記録、ライフサイクルイベント、Canon内容を除去しないため、消去の代用にならない。
 
-### Explicit apply
+### 明示適用
 
-Apply requires the exact preview ID and integrity value plus explicit
-confirmation of the resolved target set. Under the single-writer lock, LifeDB
-recomputes dependencies, holds, object digests, and the durable sequence.
+適用は、厳密プレビューIDと完全性値に加え、解決済み対象集合の明示確認を要する。単一ライターロック下で、LifeDBは依存、ホールド、オブジェクトダイジェスト、durable連番を再計算する。
 
-If anything differs, the preview is stale and apply fails closed. The caller must
-request and review a new preview. A general approval such as "apply current
-policy" is insufficient.
+差異があればプレビューは古く、適用はフェールクローズする。呼出し側は新規プレビューを要求・審査しなければならない。「現行ポリシーを適用せよ」のような包括承認は不十分である。
 
-For each successful payload eviction, LifeDB:
+成功ペイロード退避ごとに、LifeDBは以下を行う。
 
-1. verifies that all typed requirements and holds remain satisfied;
-2. removes or moves only the exact approved object bytes;
-3. appends an immutable `payload.evicted` event with actor, reason, policy
-   version, preview reference, and resulting state;
-4. marks runtime projections dirty;
-5. returns an apply report including bytes affected and any failures.
+1. 型付き要件とホールドが満たされたままであることを検証する。
+2. 承認済み厳密オブジェクトバイト列のみを除去または移動する。
+3. アクター、理由、ポリシー版、プレビュー参照、結果状態を備えた不変`payload.evicted`イベントを追記する。
+4. ランタイム投影を汚す。
+5. 影響バイト列と失敗を含む適用報告を返す。
 
-A partial apply is never reported as complete. Recovery folds only durable events
-whose corresponding filesystem action was completed or deterministically
-reconciled.
+部分適用を完了として報告しない。回復は、対応するファイルシステム操作が完了または決定論的に照合されたdurableイベントのみ畳み込む。
 
-The reference implementation appends `retention.apply-prepared`, moves exact
-candidate objects beneath transaction-scoped `quarantine/retention/`, appends
-`payload.evicted` and `retention.apply-committed`, then removes quarantined
-bytes. `lifedb retention recover` restores objects and appends compensating
-events for prepared-only transactions, or cleans quarantine residue for a
-committed transaction. It does not schedule either preview or apply.
+リファレンス実装は`retention.apply-prepared`を追記し、厳密候補オブジェクトをトランザクション範囲`quarantine/retention/`配下に移し、`payload.evicted`と`retention.apply-committed`を追記してから、quarantine内バイト列を除去する。`lifedb retention recover`は、準備のみトランザクションについてオブジェクトを復元し補償復元・中止イベントを追記し、確定済みトランザクションについてはquarantine残分を清掃する。プレビューも適用もスケジュールしない。
 
-Because quarantine contains the only staged copy while an apply is prepared or
-in flight, it MUST be included in a consistent backup of that transaction. In
-the current v0.2 implementation quarantine is for retention transactions, not a
-passive-collector landing area.
+適用の準備済みまたは実行中はquarantine内に唯一の段階複製があるため、そのトランザクションの一貫バックアップには必ず含めなければならない（MUST）。現行v0.2実装ではquarantineは保持トランザクションのためであり、受動収集器の着地点ではない。
 
-The exact CLI sequence is:
+厳密CLI手順は次のとおり。
 
 ```sh
 lifedb retention preview
@@ -178,95 +130,77 @@ lifedb retention apply <plan-id> --confirm 'sha256:<confirmation>' \
 lifedb retention recover
 ```
 
-`<plan-id>` and `<confirmation>` must be copied from the preview output. An
-empty candidate list is valid and causes no payload eviction.
+`<plan-id>`と`<confirmation>`はプレビュー出力から写し取ること。空の候補一覧は有効であり、ペイロード退避は起きない。
 
-## Eviction preconditions
+## 退避前提条件
 
-An object may appear in an ordinary eviction preview only when all are true:
+通常保持集合は、現行全参照にわたりオブジェクトダイジェストごとに算出し、一つの阻止参照が共有ダイジェスト全体を阻止する。オブジェクトダイジェストは、投影ペイロード状態が`present`の全取得と束ねる。一つの`grace`取得が提案する共有ダイジェストも、同バイト列への別参照が`pinned`もしくは`durable`、ホールド中、raw所要、または他に保護される場合は阻止されたままである。通常退避プレビューに載るのは、すべて真の場合のみである。
 
-1. every referencing retention class permits a proposal;
-2. no current Claim has an unsatisfied `raw` requirement for it;
-3. every required `representation:<role>` remains present and verifies;
-4. no prepared or committed Canon transaction snapshot needs it;
-5. no legal, archival, or owner hold applies;
-6. the policy version and grace conditions are satisfied;
-7. the resulting effective Evidence view remains valid;
-8. the proposal reports recoverability and exact estimated bytes.
+1. 参照各保持区分が候補化を許すこと。
+2. 現行Claimに未充足`raw`要件がないこと。
+3. 要する各`representation:<role>`が存在し検証されること。
+4. 準備済みまたは確定済みCanonトランザクションのスナップショットがそれを要しないこと。
+5. 法務、保管、所有者ホールドが適用されないこと。
+6. ポリシー版と猶予条件が満たされること。
+7. 結果の実効Evidenceビューが有効のままであること。
+8. 候補化が回復可能性と厳密推定バイト列を報告すること。
 
-`pinned` and irreplaceable objects are never offered for ordinary apply. Changing
-or removing the policy that pins them is a separate explicit action.
+`pinned`および代替不能オブジェクトは通常適用に決して出さない。それらを固定するポリシーの変更または除去は別の明示操作である。`reference-only`取得は原本バイト列を格納しないため、候補ダイジェストに寄与しない。`grace`取得はポリシー猶予条件の成立後にのみ適格となり、`derivative-only`取得は、要する各表現物ロールが存在しダイジェスト有効なdurableオブジェクト上にある場合にのみ適格となる。バイト列が欠落、破損、または完全性検証失敗の取得は、候補ではなく阻止として報告する。
 
-## Payload lifecycle
+適格性は適用時に現行取得、Claim、ホールド、Canonスナップショット、オブジェクト完全性、ポリシーダイジェスト、durable連番から再検査する。差異があれば永続化計画は古く、適用はフェールクローズする。
 
-The sealed capture records state at capture and is never edited by retention.
-Current state is projected from immutable events in global sequence order.
+`lifedb retention set <evidence-id> <class> --actor ... --reason ...`は、一つの`retention.changed`イベントを追記し、単一取得を現行実効区分から変更可能区分（`pinned`、`durable`、`grace`、`derivative-only`）間で移動する。`reference-only`のEvidenceは作れず変換もできない。自らは何も退避せず、変更された取得のダイジェストが適格かは後のプレビューが決める。
 
-Relevant event types include:
+## ペイロードライフサイクル
 
-- `retention.changed`;
-- `hold.placed` and `hold.released`;
-- `payload.eviction-proposed`;
-- `payload.evicted`;
-- `payload.missing-observed`;
-- `payload.restored`;
-- `payload.redacted`.
+封印済み取得記録は取得時状態を記録し、保持で編集しない。現行状態は全体連番順の不変イベントから投影する。
 
-Restoration succeeds only when restored bytes match the original content digest.
-A digest match confirms byte equality, not source authenticity.
+関連イベント型は次のとおり。
 
-## Owner-authorized erasure
+- `retention.changed`。
+- `hold.placed`と`hold.released`。
+- `payload.eviction-proposed`。
+- `payload.evicted`。
+- `payload.missing-observed`。
+- `payload.restored`。
+- `payload.redacted`。
 
-Erasure is distinct from ordinary payload eviction. It may remove capture
-records, lifecycle events, objects, representations, Canon content or snapshots,
-and runtime projections instead of leaving an observation envelope.
+復元は、復元バイト列が原本内容ダイジェストに一致した場合のみ成功する。ダイジェスト一致はバイト列等価を確認するものであり、情報源真正性ではない。
 
-Erasure requires:
+## 所有者承認の消去
 
-1. strong owner authorization;
-2. an exact scope expressed by resolved IDs and digests, never an unresolved glob;
-3. a preview of affected current Claims, transaction history, rollback ability,
-   derived content, runtime copies, and known backups;
-4. confirmation that identifies that exact preview and target set;
-5. a final report of completed, failed, and externally outstanding actions.
+消去は通常ペイロード退避と別である。観測包みを残さず、取得記録、ライフサイクルイベント、オブジェクト、表現物、Canon内容またはスナップショット、ランタイム投影を除去し得る。
 
-No automatic policy, model, Candidate reconciler, collector, or storage-pressure
-job may exercise owner-erasure authority.
+消去は以下を要する。
 
-This section specifies a future safety boundary. The v0.2 reference software
-does not implement owner-erasure preview or apply. Ordinary retention is not an
-erasure substitute because it preserves Capture and lifecycle Event records.
+1. 強固な所有者認可。
+2. 解決済みIDとダイジェストで表した厳密範囲であり、未解決のglobは不可。
+3. 影響現行Claim、トランザクション履歴、ロールバック能力、派生内容、ランタイム複製、既知バックアップのプレビュー。
+4. その厳密プレビューと対象集合を特定する確認。
+5. 完了、失敗、外部未済操作の最終報告。
 
-A minimal erasure receipt is retained only when allowed by the requested scope.
-If total removal forbids a receipt, LifeDB must not retain the removed personal
-data merely for audit convenience.
+自動ポリシー、モデル、Candidate（候補）照合器、収集器、格納圧迫処理は所有者消去権限を行使できない。
 
-## Backups and external responsibility
+本節は将来の安全境界を規定する。v0.2リファレンスソフトウェアは所有者消去プレビューも適用も実装しない。通常保持は取得・ライフサイクルイベント記録を保つため、消去の代用にならない。
 
-An apply or erasure operation controls the live vault and its runtime projections.
-LifeDB can inventory configured backups and report their impact, but it cannot
-guarantee deletion from offline disks, snapshots, remote backup providers,
-exports, or copies held by agent/model providers.
+最小の消去受領証は、要求範囲が許す場合にのみ保持する。完全除去が受領証を禁じる場合、監査便宜のためだけに除去された個人資料を保持してはならない。
 
-The deployment operator is responsible for:
+## バックアップと外部責務
 
-- encrypted backup storage and separate key custody;
-- a known backup inventory and expiry schedule;
-- deleting or expiring backup generations affected by owner erasure;
-- preventing an old restore from silently reintroducing erased material;
-- documenting any external copy that cannot be removed.
+適用または消去操作は、稼働中保管庫とそのランタイム投影を管理する。LifeDBは設定済みバックアップを棚卸し、影響報告できるが、オフライン記録媒体、スナップショット、遠隔バックアップ事業者、出力物、エージェント・モデル提供者が持つ複製からの削除は保証できない。
 
-An ordinary payload eviction does not retroactively delete backup copies unless
-backup policy says so. Owner erasure must address them explicitly.
+配置運用者は以下に責務を持つ。
 
-## Storage pressure
+- 暗号化バックアップ格納と鍵の分離保管。
+- 既知バックアップ在庫と有効期限日程。
+- 所有者消去の影響バックアップ世代の削除または期限切れ。
+- 古い復元が消去済み資料を黙って再導入する防止。
+- 除去できない外部複製の文書化。
 
-Storage pressure produces reports and previews, never autonomous apply. Policies
-may group candidates by source, age, reproducibility, role, sensitivity, and
-estimated freed bytes. Quotas and free-space thresholds may reject or pause new
-capture, but they do not grant deletion authority.
+通常ペイロード退避は、バックアップ方針が定めない限りバックアップ複製を遡及削除しない。所有者消去はそれらを明示対処しなければならない。
 
-The reference implementation does not enforce per-source quotas, request-rate
-limits, or free-space thresholds. Deployments that ingest untrusted or remote
-sources must enforce these controls at the collector, reverse proxy, or host
-boundary.
+## 格納圧迫
+
+格納圧迫は報告とプレビューのみを作り、自律適用は決して行わない。ポリシーは候補を情報源、経過、再現性、ロール、感度、推定解放バイト列で束ねてもよい。割当と空き容量しきい値は新規取得を拒否または停止できるが、削除権限を与えない。
+
+リファレンス実装はソース別割当、要求レート制限、空き容量しきい値を強制しない。信頼できないまたは遠隔情報源を取込む配置は、収集器、リバースプロキシ、ホスト境界でこれら管理を強制すること。

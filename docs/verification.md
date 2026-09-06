@@ -1,31 +1,47 @@
-# Verification record
+# 検証記録（v0.2リリースゲート記録）
 
-Date: 2026-09-01
+日付: 2026-09-05
 
-## Completed locally
+この記録は、この日付に観測した累積v0.2作業ツリーについて述べる。検証時に存在したダーティな作業ツリー状態に適用するものであり、クリーンなHEAD `1c6b916`単独に対するものではない。Git状態は、意図的にダーティな累積計画変更に加え、生成済み`.omo`および`.opencode`ハーネス成果物を示した。この検証の一環としてコミット、タグ、プッシュ、CI実行は行っていない。
 
-- Python source compilation.
-- Six unit and integration tests.
-- UUIDv7 generation and validation.
-- Vault initialization.
-- SHA-256 object deduplication.
-- Sealed Evidence creation.
-- Canon and Evidence validation.
-- SQLite FTS index construction.
-- Japanese bigram retrieval fallback.
-- Complete deletion of `runtime/` followed by rebuild and successful search.
-- HTTP health, ingest, rebuild, and Context Pack endpoints.
-- JSON parsing of all supplied JSON Schemas.
-- YAML parsing and structural checks of Compose and GitHub Actions files.
+## テスト
 
-## Deferred to a Docker-capable host
+全体スイートの形式: `PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v`。観測結果は244件のテスト、PASSだった。この実行のPython環境は3.11.15だった。
 
-The authoring environment did not contain a Docker executable, so the image and
-Compose stack were not launched locally. `.github/workflows/ci.yml` contains a
-Docker build and recovery smoke test. The first GitHub push or self-hosted
-deployment must confirm this job before v0.1 is tagged.
+重点スイートもこの環境で合格した。保持スイートは30件を対象とした。サーバーセキュリティスイートは26件を対象とした。重点Canon・検証集合は43件を対象とした。これらの件数はここで実行した内容を示すものであり、将来のあらゆる構成が同様に振る舞う証明にはならない。
 
-## Release gate
+## コンパイルと差分衛生
 
-Do not tag v0.1 until both CI jobs pass and a real host performs the recovery
-drill in `docs/disaster-recovery.md`.
+コンパイルの形式: `.venv/bin/python -m compileall -q src tests`。差分衛生の形式: `git diff --check`。いずれも観測した作業ツリーでPASSを返した。
+
+## パッケージ化
+
+パッケージビルドはPEP 517の`build 1.6.0`をシステムPython 3.14.7環境下で用いた。`lifedb-0.2.0-py3-none-any.whl`および`lifedb-0.2.0.tar.gz`を生成した。同梱スキーマ7件はすべてソースツリーと両成果物の間でバイト一致した。ホイール由来とsdist由来の分離インストールはそれぞれ、新規保管庫を初期化して検証し、ソースツリーからのimportは行わなかった。独立検証者が両成果物を再構築し、ホイールのインストールに加えてinit、validate、ingestを実行した後、sdistからホイールに再構築して同じバイト一致結果を得た。依存解決はロック済みオフラインミラーに対する実行ではないため、新規ネットワークではここに固定したものと異なる推移的依存バージョンを解決し得る。
+
+## 現行ソースCLI
+
+新規`lifedb init`は想定配置を作成し、`evidence/_events/`および`okf_version: "0.2"`を報告するCanonバンドルを含む。現行ソースによるingest、validate、rebuild、search、context、retention preview、runtime reset、rebuild、retrievalの実行はすべて合格した。このCLI一連は独立実行で二度合格した。結果はこの作業ツリーとフィクスチャデータについて述べるものであり、他の保管庫の約束ではない。
+
+## HTTP
+
+現行ソースサーバーに対するヘルス検査は認証なしで200を返した。欠落または誤った資格情報の要求は保護ルートで401を受けた。認可済みingest、rebuild、search、context、validate呼出しは成功し、権威ラベルは呼出し側入力ではなくサーバーが固定した。不正形式の要求は入力を送り返さず安定した4xx応答を返した。無効値の構成済みトークンは待受ソケットのbind前に失敗した。認証未構成では、ヘルスは200を返す一方で`/v1/search`は503を返した。範囲限定HTTPクリーンアップは合格し、試験用サーバーは残らなかった。
+
+## DockerとCompose復旧
+
+Dockerクライアントは29.7.2、サーバーは29.6.1、Composeは5.5.0だった。タスク範囲のビルドと実行は、この作業ツリーに対する二度の独立実行で合格した。イメージはPython 3.13を用いる。観測したコンテナは非ゼロ実効UIDで動作し、タスク範囲の正確なlocalhostバインドとバインドマウント保管庫を用い、認証済みワークフローを完遂した。durableファイルハッシュは停止サーバーでのruntime reset、rebuild、validateを跨いで不変のまま、再起動後のretrievalは成功した。durable専用状態はコンテナ層に存在しなかった。タスク範囲のDocker・Composeクリーンアップは合格し、これらの実行由来のQAコンテナ、ボリューム、プロセスは残らなかった。
+
+## 言語サーバーの注記
+
+言語サーバー診断は、`basedpyright-langserver`が未導入であり導入が見送られたため利用できなかった。上記のコンパイル、テストスイート、ランタイムQAがここで用いた代替証拠である。これらは言語サーバーが診断ゼロを報告するであろうことの等価な証明ではない。
+
+## 後片付け
+
+今回のQA保管庫、サーバー、コンテナ、取得済み試験成果物はすべてタスク範囲内で除去した。残存したバックグラウンドQAプロセスも試験資源もない。Git状態は検出通りダーティなまま残した。清掃すれば計画作業を破棄することになったためである。
+
+## 制限と未検証事項
+
+範囲外または今回未検証: リモートTLSおよびリバースプロキシ終端、実バックアップ事業者保管とオフライン復元、非Linux記述子経路、複数デバイス・複数ライター動作、ならびにリポジトリの明示未実装v0.2除外下の全項目。自動抽出、定期退避、所有者消去、MCP、ベクトルまたはランク付き検索、外部コレクター、表現物生成、複数ライター同期、アプリケーション層暗号化または署名を含む。ここでの試験証拠は実行済み経路のみを対象とする。
+
+## リリースゲート
+
+この記録単独でタグ付けや公開をしてはならない。クリーンなツリー、CI合格、タグ、プッシュ、本番利用対応、暗号学的真正性、完全なバックアップ復元、クロスプラットフォーム可搬性、未実装機能まで対象に含むことのいずれも主張しない。

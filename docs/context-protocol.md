@@ -1,62 +1,37 @@
-# Context Protocol 0.2
+# コンテキストプロトコル 0.2
 
-Status: v0.2 executable contract
+状態: v0.2実行可能契約
 
-## Goal
+## 目的
 
-LifeDB supplies authorized, bounded, attributable context without making a model
-voluntarily remember to search. A fully integrated host invokes Context Preflight
-before every user turn and captures the turn afterward. The v0.2 reference
-service implements Context building; it does not ship universal host hooks,
-automatic postflight capture, or MCP.
+LifeDBは、モデルが自発的に検索を思い出す必要なく、認可され、上限があり、帰属の明らかなコンテキストを提供する。完全統合されたホストは、利用者の各ターンの前にContext Preflightを呼び出し、その結果のターンを取得記録として取り込む。v0.2リファレンスサービスはContext構築を実装する。汎用ホストフック、自動postflight取込み、MCPは提供しない。
 
-Context Packs are disposable runtime artifacts. They are selections from Canon,
-Evidence, retained representations, and runtime projections, never a new source
-of authority.
+Context Pack（コンテキストパック）は使い捨てのランタイム成果物である。Canon（カノン）、Evidence（証跡）、保持表現物、ランタイム投影からの選択物であり、新たな権威源には決してならない。
 
-## Authorization
+## 認可
 
-Authorization happens before retrieval, ranking, snippet generation, expansion,
-and rendering.
+認可は、検索、順位付け、断片生成、展開、描画より前に行う。
 
-For the reference HTTP server:
+リファレンスHTTPサーバーでは以下に従う。
 
-- every `/v1/*` operation requires `Authorization: Bearer <token>`;
-- the token is configured with `LIFEDB_API_TOKEN` and is never stored in the
-  vault;
-- `/health` is the only unauthenticated endpoint;
-- `LIFEDB_SENSITIVITY_CEILING` sets the server-profile maximum and defaults to
-  `personal`.
+- すべての`/v1/*`操作に`Authorization: Bearer <token>`を要する。
+- トークンは`LIFEDB_API_TOKEN`で設定し、保管庫には決して格納しない。
+- `/health`のみ認証不要のエンドポイントである。
+- `LIFEDB_SENSITIVITY_CEILING`はサーバープロファイルの最大値を定め、既定は`personal`である。
 
-The reference server uses one owner Bearer token for all authorized operations;
-there are no operation-level scopes within that token. A deployment exposing the
-service beyond localhost must add TLS, a reverse proxy, destination policy, and
-rate/quota controls. Per-source quotas, request-rate limits, and free-space
-threshold enforcement are not implemented by the reference.
+リファレンスサーバーは、すべての認可操作に一つの所有者Bearerトークンを使い、そのトークン内に操作層スコープはない。サービスをlocalhostの外に公開する配置では、TLS、リバースプロキシ、宛先ポリシー、レート・割当管理を追加すること。ソース別割当、要求レート制限、空き容量しきい値の強制はリファレンスが実装しない。
 
-A request's `sensitivity_ceiling` may narrow the server-profile maximum but
-cannot raise it. Request fields named `client`, `actor`, `session`, or
-`workspace` are routing labels, not authentication. Unknown sensitivity values
-fail closed.
+要求の`sensitivity_ceiling`はサーバープロファイル最大値を狭められても、広げられない。`client`、`actor`、`session`、`workspace`という名の要求欄は経路指定ラベルであり、認証ではない。未知の感度値はフェールクローズする。
 
-For the v0.2 reference, the authenticated Bearer token identifies the one owner
-and the server fixes the principal, destination, and purpose labels recorded in
-the pack. The reference applies the server sensitivity ceiling (which a
-request may narrow), the ingestion sensitivity floor, and the global server
-profile's validated Context budgets. It has no per-client operation scopes and
-does not enforce destination or purpose allowlists. Direct Evidence expansion
-uses the same sensitivity decision as search and Context building.
+v0.2リファレンスでは、認証済みBearerトークンが一人の所有者を示し、サーバーがパックに記録するプリンシパル、宛先、目的ラベルを固定する。リファレンスはサーバー感度上限（要求が狭められることがある）、取込み感度下限、全体サーバープロファイルの検証済みContext予算を適用する。クライアントごとの操作スコープはなく、宛先・目的許可リストも強制しない。直接Evidence展開は、検索およびContext構築と同じ感度判定を使う。
 
-The normative full-deployment design treats effective authorization as an
-intersection of authenticated principal, operation, destination, purpose, and
-applicable policy. Such per-client allowlists and purpose-bound egress controls
-are deployment policy, not capabilities of the v0.2 reference.
+規範的な完全配置設計では、実効認可を認証済みプリンシパル、操作、宛先、目的、適用ポリシーの積集合として扱う。そのようなクライアント別許可リストや目的に拘束された送出管理は配置ポリシーであり、v0.2リファレンスの機能ではない。
 
-## Operations
+## 操作
 
 ### `context.build`
 
-An example request is:
+要求例は次のとおり。
 
 ```json
 {
@@ -73,12 +48,9 @@ An example request is:
 }
 ```
 
-Only `query` is semantically required. Server policy supplies authorization and
-maximum budgets. Optional request values can reduce those maxima.
+意味上必須なのは`query`のみである。認可と最大予算はサーバーポリシーが与える。任意の要求値はそれら最大値を下げられる。
 
-The output validates against `schemas/context-pack.schema.json` and contains
-structured items plus a rendered Markdown representation. It also reports the
-applied budgets, truncation or degradation, and:
+出力は`schemas/context-pack.schema.json`に対して検証され、構造化項目と描画済みMarkdown表現を含む。適用予算、切詰めまたは縮退、そして以下も報告する。
 
 ```json
 {
@@ -90,134 +62,79 @@ applied budgets, truncation or degradation, and:
 }
 ```
 
-`durable_sequence` is the greatest valid durable event sequence visible to the
-builder. `indexed_sequence` is the greatest sequence included by the runtime
-projection. `dirty` is true when durable state may not be fully projected.
+`durable_sequence`は、構築器に見える有効durableイベント連番の最大値である。`indexed_sequence`は、ランタイム投影が取り込んだ連番の最大値である。`dirty`は、durable状態が完全投影されていない可能性がある場合に真となる。
 
-The builder SHOULD synchronously rebuild a dirty or lagging lexical index before
-selection. If it cannot, it MUST mark the pack degraded and MUST NOT imply that
-the returned results are complete.
+構築器は、選択前にダーティまたは遅延した語彙索引を同期的に再構築すべきである（SHOULD）。できない場合、パックを縮退と標示しなければならず（MUST）、返した結果が完全である旨を示唆してはならない（MUST NOT）。
 
-Reference limits are a 4,096-character query, at most 100 results, and a
-1,000,000-character ceiling for an individual Context object or Evidence
-expansion. The default total/layer budgets below may be reduced by policy.
+リファレンス上限は、4,096文字の問合せ、最大100件の結果、個々のContextオブジェクトまたはEvidence展開あたり1,000,000文字の上限である。下記の既定合計・層予算はポリシーで下げられることがある。
 
 ### `evidence.expand`
 
-Expansion resolves an authorized Evidence handle into its sealed capture,
-effective lifecycle view, and only the permitted raw or represented content.
-Expansion is separate so a small Context Pack never silently includes an entire
-transcript or large document.
+展開は、認可済みEvidenceハンドルを封印済み取得記録、実効ライフサイクルビュー、許可されたrawまたは表現内容のみに解決する。小さなContext Pack（コンテキストパック）が記録全体や大文書を黙って含まないよう、展開は分離する。
 
-An Evidence ID is an identifier, not a bearer capability. Possession of the ID
-does not bypass authorization. Expansion reports unavailable or erased required
-material rather than substituting another representation without saying so.
+Evidence IDは識別子であり、ベアラー能力ではない。IDの所持は認可を迂回しない。展開は、利用不可または消去済みの必須資料を、断りなく別表現物で置換せず報告する。
 
-### Postflight capture
+### Postflight取得
 
-Automatic postflight capture and offline replay are host-adapter responsibilities
-and are not implemented by the v0.2 reference software. A future `event.append`
-operation must use idempotency, preserve original event time separately from
-ingestion time, authenticate its producer, and obey capture and sensitivity
-policy.
+自動postflight取込みとオフライン再送はホスト適合部の責務であり、v0.2リファレンスソフトウェアは実装しない。将来の`event.append`操作は、べき等性を使い、取込み時刻とは別に本来のイベント時刻を保持し、生成者を認証し、取得・感度ポリシーに従わなければならない。
 
-## Character budgets
+## 文字数予算
 
-The default maximums are:
+既定最大値は次のとおり。
 
-| Field | Default |
+| 項目 | 既定値 |
 | --- | ---: |
 | `budget_chars` | 24000 |
 | `core_chars` | 8000 |
 | `continuity_chars` | 4000 |
 | `relevant_chars` | 12000 |
 
-The v0.2 reference uses one global server profile for all authenticated
-requests. Request values may only lower those maxima. A full deployment MAY
-configure distinct budgets per authenticated client. If the requested or
-configured layer totals exceed
-`budget_chars`, the server reduces layer allowances so the applied layer sum is
-at most the applied total.
+v0.2リファレンスは、すべての認証要求に一つの全体サーバープロファイルを使う。要求値はそれら最大値を下げることしかできない。完全配置は認証クライアント別に異なる予算を設定してもよい（MAY）。要求または設定の層合計が`budget_chars`を越える場合、サーバーは層割当てを縮め、適用層合計が適用総量以下になるようにする。
 
-A character is a Unicode scalar value. In the v0.2 reference implementation,
-`used_chars` counts selected item titles and snippets; fixed Markdown headings,
-source labels, and delimiters are security framing outside that content budget.
-Truncation occurs on valid Unicode boundaries, is disclosed per item or layer,
-and never removes source identity or the untrusted-data boundary. Clients that
-need a hard transport or model-token cap must additionally bound the complete
-serialized pack.
+文字とはUnicodeスカラー値である。v0.2リファレンス実装では、`used_chars`は選択項目のタイトルと断片を数え、固定Markdown見出し、情報源ラベル、区切りは内容予算外のセキュリティ用枠組みである。切詰めは有効Unicode境界で行い、項目または層ごとに開示し、情報源身元や信頼できないデータ境界を決して除去しない。厳密な輸送またはモデルトークン上限が要るクライアントは、直列化済みパック全体にも別途上限を設けること。
 
-Core is important but not unbounded. No document, layer, or number of results can
-override the total budget.
+Coreは重要だが無制限ではない。文書、層、結果件数のいずれも総予算を上書きできない。
 
-## Context layers
+## Context層
 
 ### Core
 
-Parseable Markdown documents beneath `canon/core/` with a valid
-`x-lifedb.id` are eligible subject to sensitivity filtering. Core contains
-stable, high-impact accepted context and is selected within `core_chars`; the
-builder does not run full Canon cross-record validation during selection. Use
-`lifedb validate` for full Canon schema and reference checks. Detailed
-evidence, exhaustive device inventories, and raw transcripts do not belong here.
+`canon/core/`配下の解析可能Markdown文書で、有効な`x-lifedb.id`を持つものは、感度選別の対象として適格である。Coreは安定した影響の大きい承認済みコンテキストを含み、`core_chars`内で選択する。構築器は選択時に完全なCanon横断記録検証を行わない。完全なCanonスキーマ・参照検査には`lifedb validate`を使うこと。詳細証拠、網羅的な機器一覧、生の記録はここに置かない。
 
-Core is accepted memory, not host policy. It cannot grant filesystem, network,
-tool, model, or secret access or override system-level instructions.
+Coreは承認済み記憶であり、ホストポリシーではない。ファイルシステム、ネットワーク、ツール、モデル、秘密への到達を付与できず、システム層の指示を上書きできない。
 
 ### Continuity
 
-Continuity represents open loops: the active project, recent decisions, current
-task state, and unresolved questions. The v0.2 reference uses a deterministic
-selection heuristic rather than an authoritative task-state projector:
+Continuityは未完了事項を表す。稼働中の案件、直近の決定、現在の作業状態、未解決の問いである。v0.2リファレンスは、権威ある作業状態投影ではなく決定論的選択ヒューリスティックを使う。
 
-- non-deprecated Canon documents of type `Project`, `Goal`, `Conflict`, or
-  `Decision` are selected when no status Claim excludes them, or when an active
-  or disputed status Claim has an active/open value;
-- when `session` or `workspace` is supplied, recent `conversation`, `message`,
-  or `event-batch` Evidence with a matching `source` field or
-  `source.metadata` label is selected in reverse capture-time order;
-- Core duplicates are removed, authorization is applied, and the Continuity
-  character budget limits the result.
+- 非推奨でないCanon文書で型が`Project`、`Goal`、`Conflict`、`Decision`のものは、状態Claim（主張）による除外がない場合、または有効もしくは係争中の状態Claimが有効または公開値を保つ場合に選択する。
+- `session`または`workspace`の指定時は、`source`欄または`source.metadata`ラベルが一致する直近の`conversation`、`message`、`event-batch`のEvidenceを取得時刻の逆順で選択する。
+- Core重複を除き、認可を適用し、Continuity文字数予算で上限を設ける。
 
-These labels are caller-supplied routing hints, not authenticated identity, and
-the heuristic does not infer dependencies, completion, or priority.
+これらラベルは呼出し側が与える経路指定ヒントであり、認証身元ではない。このヒューリスティックは依存、完了、優先度を推定しない。
 
-Continuity is therefore populated by the reference implementation when matching
-Canon or routed recent Evidence exists; it is not an empty placeholder or an
-unimplemented projection.
+したがってContinuityには、一致するCanonまたは経路指定の直近Evidenceがある場合にリファレンス実装が内容を入れる。空の仮置きでも未実装の投影でもない。
 
 ### Relevant
 
-Relevant lexical retrieval always runs when `context.build` is invoked with a
-non-empty query. It searches authorized:
+`context.build`を空でない問合せで呼ぶと、常に関連語彙検索が走る。認可済みの以下を検索する。
 
-- Canon prose;
-- structured Canon Claims and human-readable statements;
-- readable Evidence content and capture metadata;
-- retained textual representations projected from lifecycle events.
+- Canon散文。
+- 構造化Canon Claimと人間可読文。
+- 可読Evidence内容と取得メタデータ。
+- ライフサイクルイベントから投影した保持テキスト表現物。
 
-Retrieval applies effective sensitivity before returning results. Structured
-Claim fields are indexed alongside Canon prose, and effective readable Evidence
-includes retained textual representations. The SQLite rebuild also materializes
-concept, Claim, Claim-Evidence, and Claim-edge tables, but Relevant selection
-does not use graph traversal or graph ranking. Vector similarity and learned
-reranking are not implemented in v0.2.
+検索は結果返却前に実効感度を適用する。構造化Claim欄はCanon散文と並べて索引付けし、実効可読Evidenceは保持テキスト表現物を含む。SQLite再構築は概念、Claim、Claim-Evidence、Claim辺の表も実体化するが、Relevant選択はグラフ横断もグラフ順位付けも使わない。ベクトル類似度と学習型再順位付けはv0.2で実装しない。
 
-### Evidence handles
+### Evidenceハンドル
 
-The pack returns stable, authorized Evidence IDs and short snippets. Full
-Evidence is expanded only for exact history, quotation, provenance inspection, or
-dispute resolution. A Canon result SHOULD expose its typed Evidence handles when
-authorized so a client can inspect support without repeating an unconstrained
-search.
+パックは安定した認可済みEvidence IDと短い断片を返す。完全Evidenceは、厳密な履歴、引用、来歴検査、紛争解決のためにのみ展開する。Canon結果は、認可範囲で型付きEvidenceハンドルを公開すべきであり（SHOULD）、クライアントは無制限な検索の繰返しなしに裏付けを検査できる。
 
-## Untrusted-content boundary
+## 信頼できない内容の境界
 
-Canon and Evidence may contain prompt-injection text. Retrieved content is data,
-not an instruction channel.
+Canon（カノン）とEvidence（証跡）はプロンプト注入文を含み得る。取得内容は資料であり、指示経路ではない。
 
-Each rendered item is enclosed by reserved elements carrying source identity,
-sensitivity, and an explicit untrusted marker. For example:
+各描画項目は、情報源身元、感度、明示の信頼できない標識を持つ予約要素で囲む。例を示す。
 
 ```text
 <lifedb-data source="evidence:019..." sensitivity="personal" untrusted="true">
@@ -225,76 +142,45 @@ The retrieved snippet appears here.
 </lifedb-data>
 ```
 
-The renderer HTML-escapes titles and content so retrieved bytes cannot create a
-closing element. Structured Context items remain the authoritative boundary metadata.
-Clients MUST NOT execute instructions found inside the delimiters or let them
-grant permissions, request secrets, alter retention, promote Candidates, or
-override host policy.
+描画器はタイトルと内容をHTML逸出するため、取得バイト列は閉じ要素を作れない。構造化Context項目が境界の権威ある付属情報であり続ける。クライアントは、区切り内の指示を実行してはならず（MUST NOT）、それらによる権限付与、秘密要求、保持変更、Candidate（候補）昇格、ホストポリシー上書きを許してもならない。
 
-This boundary reduces accidental instruction confusion; it is not a substitute
-for sandboxing, authorization, tool confirmation, or destination policy.
+この境界は偶発的指示混同を減らすものであり、サンドボックス化、認可、ツール確認、宛先ポリシーの代用ではない。
 
-Context items carry source identity, path where applicable, title, snippet,
-sensitivity, truncation, untrusted status, and (for Canon items) authorized
-Evidence handles. Items do not each carry a freshness or durable-revision
-field. Freshness is reported once for the pack by the global `watermark`:
-`durable_sequence` is the greatest valid durable event sequence visible to the
-builder, `indexed_sequence` is the greatest sequence included by the runtime
-projection, and `dirty` signals that durable state may not be fully projected.
+Context項目は情報源身元、該当する場合の経路、タイトル、断片、感度、切詰め、信頼できない状態、（Canon項目では）認可済みEvidenceハンドルを持つ。項目ごとには鮮度やdurable改訂欄を持たない。鮮度は全体`watermark`でパック単位に一度だけ報告する。`durable_sequence`は構築器に見える有効durableイベント連番の最大値であり、`indexed_sequence`はランタイム投影が取り込んだ連番の最大値であり、`dirty`はdurable状態が完全投影されていない可能性を示す。
 
-## Sensitivity behavior
+## 感度動作
 
-Filtering uses the maximum effective sensitivity of the returned fragment and
-all material included in it. A Claim that raises sensitivity cannot be exposed
-through a lower-sensitivity document snippet. Implementations must either omit
-the Claim, return a separately authorized fragment, or raise the whole fragment's
-label.
+選別は、返却断片とそれに含まれる全資料の最大実効感度を使う。感度を上げるClaimは、低感度文書断片を通じて露出できない。実装は、Claimの省略、別途認可した断片の返却、断片全体ラベルの引上げのいずれかを行わなければならない。
 
-Normatively, `restricted` content is confined to an approved local execution
-boundary, so a deployment MUST forbid it in a remote-model Context Pack even
-when the caller can read it locally. The v0.2 reference records its configured
-destination and purpose but does not implement destination allowlists or this
-remote-egress prohibition; a deployment exposing remote models must enforce
-that policy at its egress boundary.
+規範として、`restricted`内容は承認済み局所実行境界に閉じるため、呼出し側が局所で読める場合でも、配置は遠隔モデル向けContext Pack（コンテキストパック）での使用を禁じなければならない（MUST）。v0.2リファレンスは設定済み宛先と目的を記録するが、宛先許可リストもこの遠隔送出禁止も実装しない。遠隔モデルを公開する配置は、送出境界でその方針を強制すること。
 
-Authorization occurs before ranking to avoid leaking restricted titles, IDs,
-counts, or match existence through snippets and scores.
+認可は順位付けより前に行い、断片やスコアを通じた制限付きタイトル・ID・件数・一致の存在の漏出を防ぐ。
 
-## Projection freshness and failure behavior
+## 投影鮮度と失敗時動作
 
-Every durable capture, lifecycle event, Candidate action, and Canon transaction
-marks relevant runtime projections dirty. Rebuild records its durable sequence.
+すべてのdurable取得、ライフサイクルイベント、Candidate操作、Canonトランザクションは関連ランタイム投影を汚す。再構築はdurable連番を記録する。
 
-The pack is current when:
+パックが最新なのは次の場合である。
 
 ```text
 dirty == false AND indexed_sequence == durable_sequence
 ```
 
-If LifeDB is unavailable, the host remains usable and states that durable context
-was unavailable. A host may queue capture events locally, but replay must use a
-stable external ID, preserve original time, and pass normal authorization and
-capture policy. Silent fabrication of Core, Continuity, or Evidence is forbidden.
+LifeDBが利用不可でもホストは利用可能のままとし、durableコンテキストが利用不可だった旨を述べる。ホストは取得イベントを局所キューに入れてもよいが、再送は安定外部IDを使い、本来時刻を保持し、通常の認可・取得ポリシーを通すこと。Core、Continuity、Evidenceの黙った捏造は禁じる。
 
-## Host compliance levels
+## ホスト適合水準
 
-| Level | Behavior |
+| 水準 | 動作 |
 | --- | --- |
-| Full | Automatic authorized preflight before each turn and automatic policy-compliant postflight capture |
-| Assisted | A wrapper invokes preflight reliably, while some capture or expansion remains explicit |
-| Degraded | A tool exists but the model chooses whether to call it |
-| Read-only | Static, authorized Core material only |
+| Full | 各ターン前の自動認可preflightと自動ポリシー適合postflight取込み |
+| Assisted | ラッパーがpreflightを確実に呼び出す一方、一部の取得や展開は明示操作のまま |
+| Degraded | ツールは存在するが、呼び出すかはモデルが選ぶ |
+| Read-only | 静的な認可済みCore資料のみ |
 
-Compatibility tables report the actual level. The v0.2 reference service alone
-is not a Full host integration: it supplies an authenticated Context Builder and
-explicit APIs/CLI, but no universal automatic host adapter.
+適合表は実水準を報告する。v0.2リファレンスサービス単体は完全ホスト統合ではない。認証済みContext構築器と明示API・CLIを与えるが、汎用自動ホストアダプターはない。
 
-MCP is not included. Adding an MCP search tool in the future would be Degraded
-unless the host independently guarantees preflight.
+MCPは含まない。将来MCP検索ツールを加えても、ホストが独自にpreflightを保証しない限り縮退（Degraded）である。
 
-## Privacy of Context Packs
+## Context Packのプライバシー
 
-Queries, session labels, workspace paths, and rendered packs can themselves be
-sensitive. Context Packs are short-lived runtime data and SHOULD NOT be retained
-by default. Operational logging is minimal, authorized, and covered by retention
-and owner-erasure policy.
+問合せ、セッションラベル、ワークスペース経路、描画済みパック自体が機微になり得る。Context Pack（コンテキストパック）は短命ランタイム資料であり、既定で保持すべきではない（SHOULD NOT）。運用ログは最小限とし、認可を得て、保持・所有者消去方針の対象とする。

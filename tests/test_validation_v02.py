@@ -23,6 +23,12 @@ class ValidationV02Test(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def _use_zero_day_grace(self) -> None:
+        policy_path = self.root / "policies" / "retention.json"
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        policy["grace_days"] = 0
+        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
     def _append_aborted_retention(
         self,
         plan: dict,
@@ -161,10 +167,7 @@ class ValidationV02Test(unittest.TestCase):
             )
 
     def test_retention_abort_requires_exact_payload_restoration(self) -> None:
-        policy_path = self.root / "policies" / "retention.json"
-        policy = json.loads(policy_path.read_text(encoding="utf-8"))
-        policy["grace_days"] = 0
-        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+        self._use_zero_day_grace()
         record = self.vault.ingest(b"abort restoration proof", retention="grace")
         manager = RetentionManager(self.vault)
         plan = manager.preview()
@@ -204,10 +207,7 @@ class ValidationV02Test(unittest.TestCase):
         self.assertTrue(any("restoration" in error or "restored" in error for error in report.errors), report.as_dict())
 
     def test_retention_restore_cannot_downgrade_history_sensitivity(self) -> None:
-        policy_path = self.root / "policies" / "retention.json"
-        policy = json.loads(policy_path.read_text(encoding="utf-8"))
-        policy["grace_days"] = 0
-        policy_path.write_text(json.dumps(policy), encoding="utf-8")
+        self._use_zero_day_grace()
         record = self.vault.ingest(b"sensitivity restoration proof", retention="grace", sensitivity="public")
         manager = RetentionManager(self.vault)
         plan = manager.preview()
@@ -232,6 +232,7 @@ class ValidationV02Test(unittest.TestCase):
         self.assertTrue(any("lower retention restoration sensitivity" in error for error in report.errors), report.as_dict())
 
     def test_multiple_retention_transactions_keep_commit_and_abort_terminals_separate(self) -> None:
+        self._use_zero_day_grace()
         first = self.vault.ingest(b"committed transaction", source_kind="screen", retention="grace")
         manager = RetentionManager(self.vault)
         committed_plan = manager.preview()
@@ -253,6 +254,7 @@ class ValidationV02Test(unittest.TestCase):
         self.assertTrue(report.valid, report.as_dict())
 
     def test_multiple_aborted_retention_transactions_do_not_cross_associate(self) -> None:
+        self._use_zero_day_grace()
         first = self.vault.ingest(b"first aborted transaction", source_kind="screen", retention="grace")
         manager = RetentionManager(self.vault)
         first_plan = manager.preview()
@@ -274,6 +276,7 @@ class ValidationV02Test(unittest.TestCase):
         self.assertTrue(report.valid, report.as_dict())
 
     def test_retention_abort_rejects_restore_before_eviction(self) -> None:
+        self._use_zero_day_grace()
         record = self.vault.ingest(b"reverse lifecycle order", source_kind="screen", retention="grace")
         plan = RetentionManager(self.vault).preview()
         candidate = next(item for item in plan["candidates"] if record["id"] in item["evidence"])

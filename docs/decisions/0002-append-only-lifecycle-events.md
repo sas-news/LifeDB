@@ -1,83 +1,56 @@
-# ADR 0002: Append-only lifecycle events and Canon transactions
+# ADR 0002: 追記専用ライフサイクルイベントとCanonトランザクション
 
-Status: accepted for v0.2 design
+状態: v0.2設計として承認済み
 
-## Context
+## 背景
 
-LifeDB v0.1 places payload availability, retention, and representations inside a
-sealed Evidence record while also declaring that the record must never change.
-Eviction, extraction, restoration, and correction necessarily happen after
-capture, so those two requirements cannot both hold if current state is stored
-in the base record.
+LifeDB v0.1は、ペイロード有無、保持、表現物を封印済みEvidence（証跡）記録内に置き、同時にその記録を変更してはならないと宣言する。退避、抽出、復元、修正は必然的に取得後に起こるため、現行状態を基底記録に格納する限り両要件は両立しない。
 
-The Claim model similarly stores a mutable lifecycle state and one
-`observed_at` timestamp. That can describe current state but cannot reliably
-answer what Canon accepted at an earlier transaction time. Git can help review
-Markdown changes, but Git is optional, rewriteable, and does not by itself cover
-Evidence or object lifecycle.
+Claim（主張）モデルも同様に可変ライフサイクル状態と1つの`observed_at`タイムスタンプを格納する。現行状態は記述できるが、より早いトランザクション時点でCanon（カノン）が何を承認したかには確実に答えられない。GitはMarkdown変更レビューに役立ち得るが、Gitは任意であり、書換え可能であり、単独ではEvidence（証跡）・オブジェクトライフサイクルを対象にしない。
 
-Finally, a bare Claim-to-Evidence UUID does not state whether the Claim depends
-on raw bytes, an extracted representation, or only the observation envelope.
-Treating every citation as a raw-byte pin defeats selective retention; treating
-none as a pin risks destroying required support.
+さらに、素のClaim（主張）・Evidence（証跡）間UUIDは、Claim（主張）がrawバイト列、抽出表現物、観測包みのいずれに依存するかを述べない。全引用をrawバイト固定と扱えば選択保持が成り立たず、無固定と扱えば必要裏付け破壊の危険がある。
 
-## Decision
+## 決定
 
-LifeDB will keep capture facts immutable during normal operation and represent
-later state changes as ordered immutable events. Canon changes will be committed
-as transactions containing durable before/after snapshots and an authenticated
-actor.
+LifeDBは、取得事実を通常運用中不変に保ち、後続状態変化を順序付き不変イベントで表す。Canon（カノン）変更は、durable前後スナップショットと認証済みアクターを含むトランザクションとして確定する。
 
-Owner-authorized erasure is an explicit destructive exception. Append-only is an
-operational integrity rule, not a restriction on the owner's right to remove
-data.
+所有者消去は明示的破壊的例外である。追記専用は運用完全性規則であり、所有者のデータ除去権への制限ではない。
 
-## Evidence capture and lifecycle
+## Evidence（証跡）の取得とライフサイクル
 
-An Evidence capture record describes state at capture and is sealed once. Its
-payload fields do not claim to be the current availability state forever.
+Evidence（証跡）取得記録は取得時点状態を記述し、一度封印する。そのペイロード欄は、現行有無状態を永遠に示すと主張しない。
 
-Later changes are separate lifecycle events. The v0.2 event vocabulary includes
-at least:
+後続変化は別のライフサイクルイベントである。v0.2イベント語彙は少なくとも以下を含む。
 
-- `representation.added`;
-- `retention.changed`;
-- `hold.placed` and `hold.released`;
-- `payload.eviction-proposed` and `payload.evicted`;
-- `payload.missing-observed` and `payload.restored`;
-- `metadata.corrected` without removal of the original metadata;
-- `erasure.authorized` and `erasure.executed`, when a surviving receipt is
-  allowed by the erasure scope.
+- `representation.added`。
+- `retention.changed`。
+- `hold.placed`と`hold.released`。
+- `payload.eviction-proposed`と`payload.evicted`。
+- `payload.missing-observed`と`payload.restored`。
+- 元メタデータを除去しない`metadata.corrected`。
+- 消去範囲が存続受領証を許す場合の`erasure.authorized`と`erasure.executed`。
 
-Each event contains:
+各イベントは以下を含む。
 
-- a UUIDv7 event ID;
-- the target Evidence ID and, where applicable, object digest;
-- a server-assigned monotonically increasing vault sequence;
-- a timestamp with explicit offset;
-- an authenticated actor;
-- an operation and operation-specific data;
-- a human-readable reason;
-- the policy identifier and version when policy caused the action;
-- an idempotency key for replayable external requests when applicable.
+- UUIDv7イベントID。
+- `previous_event`連結付きサーバー割当て単調増加保管庫順序。
+- 明示オフセット付きタイムスタンプ。
+- 非空アクター文字列。
+- 必須の操作別`data`。
+- 感度、`sealed: true`、`sha256:<digest>`形式の`integrity`。
+- 任意UUIDv7 `target`。取得記録に作用するライフサイクルイベントとCanon（カノン）・Candidate（候補）トランザクションイベントは、それを作用対象記録IDに設定する。
 
-A `representation.added` event also records its role, media type, object digest,
-producer and version, creation time, and derivation source. Representation bytes
-are immutable content-addressed objects.
+人間可読な理由、ポリシー識別子・版、オブジェクトダイジェスト、べき等性鍵は、操作が定義する場合に操作別`data`としてのみ現れる。いずれも必須外枠要素ではない。
 
-The reference v0.2 implementation supports the capture, representation,
-retention, hold, payload, Candidate, and Canon transaction paths it validates;
-owner-erasure events below describe the future destructive boundary and are not
-an implemented erasure API.
+`representation.added`イベントはさらにロール、メディア種別、オブジェクトダイジェスト、生成者・版、作成時刻、派生元を記録する。表現物バイト列は不変内容アドレスオブジェクトである。
 
-Runtime code derives the effective Evidence view by folding the capture record
-and valid lifecycle events in vault-sequence order. Wall-clock timestamps are
-informational and never resolve event ordering. Invalid transitions remain
-visible validation errors.
+リファレンスv0.2実装は、検証対象の取得、表現物、保持、ホールド、ペイロード、Candidate（候補）、Canonトランザクション経路を支える。下記の所有者消去イベントは将来の破壊的境界を記述するものであり、実装済み消去APIではない。
 
-## Claim evidence requirements
+ランタイムコードは、取得記録と有効ライフサイクルイベントを保管庫順序で折りたたみ、実効Evidence（証跡）ビューを導出する。壁時計タイムスタンプは情報提供のみであり、イベント順序を決しない。不正遷移は目に見える検証エラーとして残る。
 
-Claim Evidence references become structured edges:
+## Claim（主張）証跡要件
+
+Claim（主張）証跡参照は構造化辺になる。
 
 ```yaml
 evidence:
@@ -89,151 +62,87 @@ evidence:
     requires: record-only
 ```
 
-The values mean:
+各値の意味は次のとおり。
 
-- `raw`: the captured payload object must be present;
-- `representation:<role>`: at least one policy-selected, durable representation
-  with that role must be present;
-- `record-only`: only the Evidence capture record is required.
+- `raw`: 取得ペイロードオブジェクトが存在しなければならない。
+- `representation:<role>`: そのロールを持ちポリシー選択されたdurable表現物が少なくとも1つ存在しなければならない。
+- `record-only`: Evidence（証跡）取得記録のみが必要である。
 
-New v0.2 Claims must state `requires`; there is no implicit default. During
-migration, an old bare Evidence ID is conservatively converted to `raw` until the
-owner or a reviewed policy narrows it.
+新規v0.2 Claim（主張）は`requires`を述べなければならない。暗黙既定はない。移行中、古い素Evidence（証跡）IDは、所有者またはレビュー済みポリシーが狭めるまで保守的に`raw`へ変換する。
 
-Retention is evaluated per object across all current accepted Claim edges,
-Evidence references, explicit holds, and policy constraints. Historical Canon
-snapshots do not remain live raw-byte pins merely because they contain an old
-`requires: raw` edge. An explicit archival or legal hold may still pin them.
+保持はオブジェクト別に、現行承認済みClaim（主張）辺、Evidence（証跡）参照、明示ホールド、ポリシー制約の全体で評価する。履歴Canonスナップショットは、古い`requires: raw`辺を含むというだけでは、生rawバイト固定として残らない。明示的保存・法務ホールドはそれらを依然固定し得る。
 
-If a required payload or representation is unavailable, the Claim is not
-silently deleted. Validation and Context generation report the broken support.
-Owner-authorized erasure may intentionally create that condition and may redact
-the affected Claim or transaction according to the approved scope.
+必要ペイロード・表現物が利用不可でも、Claim（主張）を黙って削除しない。検証とContext生成は破損裏付けを報告する。所有者消去はその状態を意図的に作り得るし、承認範囲に従い影響を受けるClaim（主張）やトランザクションを墨消しし得る。
 
-## Canon transactions
+## Canonトランザクション
 
-Every accepted Canon change is associated with one transaction. A transaction
-contains:
+承認済みCanon（カノン）変更はすべて1つのトランザクションに結び付く。トランザクションは以下を含む。
 
-- a UUIDv7 transaction ID and vault sequence;
-- preparation and commit times;
-- the authenticated actor and producing process or model version when known;
-- a reason and optional input Evidence or Candidate IDs;
-- for every affected Canon document, its stable semantic ID and durable before
-  and after snapshot bytes, with hashes;
-- explicit absence for document creation or deletion;
-- the applicable schema and policy versions.
+- UUIDv7トランザクションID（イベント`target`を兼ねる）と、準備済み・確定済みイベント経由の保管庫順序。準備・確定時刻はイベントタイムスタンプによる。
+- アクターと操作（`promotion`または`rollback`）。
+- 作用Canon文書ごとに安定セマンティックIDとパス、前後スナップショットバイト列両方への`sha256:`参照。
+- 昇格向けCandidate（候補）・Claim（主張）ID、またはロールバック向け元トランザクションID（`rollback_of`）。
 
-Hashes verify snapshot bytes but are not substitutes for snapshots. Snapshot
-bytes are durable and included in backup and erasure traversal.
+ハッシュはスナップショットバイト列を検証するが、スナップショットの代替ではない。スナップショットバイト列はdurableであり、バックアップ・消去走査に含まれる。
 
-The writer stages all after-snapshots, preserves before-snapshots, validates the
-resulting Canon graph, and records transaction preparation under the
-single-writer lock. Per-file publication is atomic. A final immutable commit
-event makes the transaction part of Canon history. Recovery either completes or
-reverts an interrupted prepared transaction from its snapshots. Only committed
-transactions participate in a future as-of reconstruction; the reference does
-not expose a general as-of API.
+ライターは全後スナップショットをステージングし、前スナップショットを保持し、結果Canonグラフを検証し、単一ライターロック下でトランザクション準備を記録する。ファイル別公開は不可分である。最終不変確定イベントがトランザクションをCanon履歴の一部にする。復旧は中断準備済みトランザクションをスナップショットから完了または復帰させる。確定済みトランザクションのみ将来as-of再構築に参加する。リファレンスは汎用as-of APIを公開しない。
 
-Validation expects the visible `canon/` tree to match the latest committed
-transaction. A direct manual edit is allowed as an authoring action, but it is
-uncommitted drift until LifeDB captures and validates it as a transaction.
-Validators report drift; the retrieval index still parses valid live Canon files,
-including such out-of-band edits.
+検証は、可視`canon/`木が最新確定トランザクションと一致することを期待する。直接手動編集は著述行為として許されるが、LifeDBがトランザクションとして取得・検証するまでは未確定漂動である。検証器は漂動を報告する。検索索引は、その種帯域外編集を含む有効稼働Canonファイルを依然解析する。
 
-An eventual as-of view can fold committed transactions through a requested vault
-sequence. The v0.2 reference does not expose a general as-of read API. A rollback
-creates a new compensating transaction whose after-snapshots restore selected
-prior content. Neither rollback nor ordinary correction deletes the transactions
-being reversed.
+将来as-ofビューは、確定済みトランザクションを要求保管庫順序まで折りたたみ得る。v0.2リファレンスは汎用as-of読取APIを公開しない。ロールバックは、後スナップショットが選択先行内容を復元する新規補償トランザクションを作る。ロールバックも通常修正も、逆転対象トランザクションを削除しない。
 
-Git remains optional. When enabled, a Canon transaction may reference a Git
-commit, but correctness, history, and rollback do not depend on that commit.
+Gitは任意のままである。有効時はCanonトランザクションがGitコミットを参照し得るが、正確性、履歴、ロールバックはそのコミットに依存しない。
 
-## Context authorization and rendering
+## Context認可と描画
 
-The Context Builder uses the effective Evidence view and the live Canon files
-that the runtime index parses during rebuild. Valid manual or out-of-band Canon
-edits are therefore searchable; Canon transactions audit managed changes, and
-validation detects drift from the latest committed snapshot. Retrieval does not
-use transaction snapshots as its sole Canon source or reconstruct an as-of
-view.
+Context Builderは、実効Evidence（証跡）ビューと、ランタイム索引が再構築中に解析する稼働Canonファイルを使う。したがって有効な手動・帯域外Canon編集は検索可能である。Canonトランザクションは管理変更を監査し、検証は最新確定スナップショットからの漂動を検出する。検索はトランザクションスナップショットを唯一Canon源にせず、as-ofビューを再構築しない。
 
-In the normative full-deployment design, authorization may combine authenticated
-client policy, operation, destination, purpose, and effective sensitivity.
-The v0.2 reference instead authenticates one owner Bearer token, records
-server-fixed principal/destination/purpose labels, and applies its global
-server sensitivity ceiling and Context budgets. It has no per-client operation
-scopes or destination/purpose allowlists; request values may only narrow
-sensitivity and budgets.
+規範的完全配置設計では、認可は認証済みクライアントポリシー、操作、宛先、目的、実効感度を組合せ得る。v0.2リファレンスは代わりに1つの所有者Bearerトークンを認証し、サーバー固定プリンシパル・宛先・目的ラベルを記録し、全体サーバー感度上限とContext予算を適用する。クライアント別操作スコープや宛先・目的許可リストを持たない。要求値は感度と予算を狭めることのみできる。
 
-Every Context build enforces total and per-layer budgets. Its result records one
-global durable event sequence, the runtime index's indexed sequence and `dirty`
-status, truncation, and degraded status in its pack-level watermark. It does not
-attach separate Canon-transaction or Evidence-lifecycle revisions to each
-result or item. Retrieved content is rendered within explicit untrusted-data
-boundaries and cannot grant permissions or override host instructions.
+すべてのContext構築は全体・層別予算を強制する。結果は、1つの全体durableイベント順序、ランタイム索引の索引済み順序・`dirty`状態、切詰め、低下状態をパック層ウォーターマークに記録する。各結果・項目にCanonトランザクション別リビジョンやEvidence（証跡）ライフサイクル別リビジョンを付さない。取得内容は明示untrusted-data境界内に描画し、権限付与やホスト指示上書きはできない。
 
-## Integrity and authenticity
+## 完全性と真正性
 
-SHA-256 content addressing verifies that available bytes match a known digest.
-It does not authenticate an actor, acquisition path, timestamp, or factual
-claim. Producer fields are trustworthy only to the extent that the service
-authenticated and assigned them. Authenticity mechanisms may be added without
-changing the lifecycle model.
+SHA-256内容アドレス指定は、利用可能バイト列が既知ダイジェストと一致することを検証する。アクター、取得経路、タイムスタンプ、事実主張を認証しない。生成者欄は、サービスが認証・割当てた範囲でのみ信頼できる。真正性機構はライフサイクルモデルを変えずに追加できる。
 
-## Erasure exception
+## 消去例外
 
-An authenticated owner may authorize erasure of an exact scope after an impact
-preview. The operation traverses captures, lifecycle events, objects,
-representations, Canon snapshots, runtime projections, and known backups.
+認証済み所有者は、影響プレビュー後に厳密範囲の消去を承認できる。操作は取得記録、ライフサイクルイベント、オブジェクト、表現物、Canonスナップショット、ランタイム投影、既知バックアップを走査する。
 
-Erasure may make as-of reconstruction or rollback intentionally incomplete. A
-minimal receipt may state that an erasure occurred only when doing so does not
-violate the requested scope. No automated eviction or ordinary client operation
-has this authority.
+消去はas-of再構築・ロールバックを意図的に不完全にし得る。最小受領証は、要求範囲に反しない場合にのみ消去発生を述べ得る。自動退避や通常クライアント操作はこの権限を持たない。
 
-## Consequences
+## 結果
 
-- Evidence records no longer contradict their own sealed status.
-- Payload and representation state can be reconstructed and audited.
-- Canon supports durable snapshot history and rollback without requiring Git;
-  general as-of reads remain future work.
-- Retention can distinguish semantic dependence from a mere citation.
-- More durable records and validation logic are required.
-- Event ordering and single-writer recovery become part of the core format.
-- Owner erasure is honest about the resulting loss of history.
+- Evidence（証跡）記録は自らの封印状態と矛盾しなくなる。
+- ペイロード・表現物状態を再構築・監査できる。
+- Canon（カノン）はGitなしにdurableスナップショット履歴とロールバックを支える。汎用as-of読取は将来課題に残る。
+- 保持は意味依存を単なる引用から区別できる。
+- より多くのdurable記録と検証論理が必要になる。
+- イベント順序と単一ライター復旧が中核形式の一部になる。
+- 所有者消去は結果としての履歴喪失に正直である。
 
-## Rejected alternatives
+## 却下した代替案
 
-### Mutate the sealed Evidence record
+### 封印済みEvidence（証跡）記録の書換え
 
-Rejected because it destroys the capture-time statement, makes races hard to
-audit, and contradicts normal-operation immutability.
+取得時点の文を破壊し、競合監査を困難にし、通常運用不変性に反するため却下。
 
-### Use Git as the only Canon history
+### GitのみをCanon履歴にする
 
-Rejected because Git is optional, does not cover all durable stores, and can be
-rewritten or omitted from a backup.
+Gitは任意であり、全durableストアを対象にせず、書換え・バックアップ除外があり得るため却下。
 
-### Pin raw bytes for every Evidence citation
+### 全Evidence（証跡）引用にrawバイト固定
 
-Rejected because common Canon facts would indefinitely pin large, reproducible
-web and passive-capture payloads.
+通常Canon事実が大規模再現可能ウェブ・受動取得ペイロードを無期限固定するため却下。
 
-### Let the caller choose its authorization ceiling
+### 呼出者に認可上限選択を許す
 
-Rejected because a request is not an authority source.
+要求は権限源ではないため却下。
 
-### Treat a matching hash as source authentication
+### 一致ハッシュを情報源認証と扱う
 
-Rejected because a digest establishes byte equality, not origin or truth.
+ダイジェストはバイト等価を示し、出所・真実を示さないため却下。
 
-## v0.2 implementation boundary
+## v0.2実装境界
 
-Version 0.2 implements the durable event and transaction formats, effective-view
-projection, validation, authorized Context rendering, and manual lifecycle
-actions including retention preview/apply/recovery. Owner-erasure preview/apply,
-general as-of reads, automatic eviction, AI reconciliation, extraction
-pipelines, multi-writer synchronization, learned retrieval, and signature
-infrastructure remain outside the v0.2 core.
+バージョン0.2は、durableイベント・トランザクション形式、実効ビュー投影、検証、認可済みContext描画、保持プレビュー・適用・回復を含む手動ライフサイクル操作を実装する。所有者消去プレビュー・適用、汎用as-of読取、自動退避、AI照合、抽出パイプライン、複数ライター同期、学習型検索、署名基盤はv0.2中核外に残る。

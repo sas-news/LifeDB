@@ -1,98 +1,70 @@
-# Disaster Recovery 0.2
+# 災害復旧 0.2
 
-## Recovery objective
+## 復旧目的
 
-LifeDB must remain understandable and recoverable on an empty machine with:
+LifeDBは、空のマシン上で以下があれば理解・復旧可能であり続けなければならない。
 
-- the repository or a copy of the matching specification, schemas, and
-  migrations;
-- a consistent copy of the durable vault;
-- a Python interpreter, the matching container image, or an independent
-  implementation of the documented formats.
+- リポジトリ、または対応仕様・スキーマ・マイグレーションの複製。
+- durable保管庫の一貫した複製。
+- Pythonインタプリタ、対応コンテナイメージ、または文書化された形式の独自実装。
 
-Docker is a normal deployment path, not the only decoding path. Recovery does
-not require access to an AI model or the model that created a retained
-representation.
+Dockerは通常の配置経路であり、唯一の解読経路ではない。復旧にAIモデルも、保持表現物を作ったモデルも要しない。
 
-## Required backup set
+## 必須バックアップ一式
 
-Back up:
+以下をバックアップする。
 
-1. `vault.json`;
-2. the complete `canon/` tree;
-3. Evidence captures and the complete `evidence/_events/` sequence;
-4. all retained `objects/`, including Canon before/after snapshot objects;
-5. `policies/`, `schemas/`, and `migrations/`;
-6. `quarantine/` whenever a retention transaction is prepared or in flight;
-7. a backup manifest containing the included durable event sequence, file list,
-   sizes, and externally protected integrity hashes.
+1. `vault.json`。
+2. 完全な`canon/`ツリー。
+3. Evidence取得記録と完全な`evidence/_events/`連番。
+4. Canon前後スナップショットオブジェクトを含むすべての保持`objects/`。
+5. `policies/`、`schemas/`、`migrations/`。
+6. 保持トランザクションの準備済みまたは実行中は`quarantine/`。
+7. 取り込んだ最大のdurableイベント連番、ファイル一覧、サイズ、外部で保護された完全性ハッシュを含むバックアップマニフェスト。
 
-`runtime/`, indexes, caches, container layers, downloaded model weights,
-Context Packs, and embeddings are not required for semantic recovery.
+`runtime/`、インデックス、キャッシュ、コンテナ層、取得済みモデル重み、Context Pack（コンテキストパック）、埋め込みはセマンティック復旧に不要である。
 
-A valid `reference-only` capture intentionally has no payload object. It remains
-recoverable as an observation record and URI, not as original bytes.
+有効な`reference-only`取得は意図的にペイロードオブジェクトを持たない。原本バイト列ではなく、観測記録とURIとして復旧可能のままである。
 
-## Consistent backup boundary
+## 一貫バックアップ境界
 
-A file-by-file copy taken across concurrent durable writes may combine a Canon
-tree, Event sequence, and Object Store from different transaction states.
-Backups therefore use one of:
+同時durable書込みを跨ぐファイル単位複写は、異なるトランザクション状態のCanonツリー、イベント連番、Object Storeを混ぜ合わせ得る。したがってバックアップは以下いずれかを使う。
 
-- a filesystem or storage snapshot taken after quiescing the single writer; or
-- a LifeDB backup operation that captures a declared durable sequence and all
-  objects and Canon snapshots reachable at that sequence.
+- 単一ライターを静止させた後のファイルシステムまたはストレージスナップショット。または
+- 宣言durable連番とその連番で到達可能な全オブジェクト・Canonスナップショットを取得するLifeDBバックアップ操作。
 
-The manifest records the greatest included durable event sequence and the
-current Canon transaction state. Prepared but uncommitted Canon transactions and
-their snapshots are included so recovery can complete or compensate them.
+マニフェストは取り込んだ最大のdurableイベント連番と現行Canonトランザクション状態を記録する。確定していない準備済みCanonトランザクションとそのスナップショットを含め、復旧で完了または補償できるようにする。
 
-LifeDB record and object digests detect changes to known bytes. They do not
-authenticate who made the backup. Backup manifests SHOULD be signed or otherwise
-protected by the backup system outside the vault.
+LifeDB記録・オブジェクトダイジェストは既知バイト列への変化を検出する。バックアップの作成者は認証しない。SHA-256ハッシュは変更・バイト列同一性検査のみであり、署名でも情報源の真正性でも決してない。バックアップマニフェストは保管庫外でバックアップシステムにより署名または保護すべきである（SHOULD）。
 
-## Recovery procedure
+復旧成功は、宣言durable連番におけるバイト列同一性、順序、実効状態を検証する。その正しさは、復元複製を侵害されたホスト、カーネル、ファイルシステム、バックアップ運用者に対抗できるものにせず、復元バイト列は対象ホストを管理する者が読めるままである。
 
-1. Restore the repository or matching v0.2 specification, schemas, and
-   migrations.
-2. Restore the durable backup into a new, empty target directory.
-3. Verify the external backup manifest before executing vault content.
-4. Validate `vault.json`, every Canon document, capture, lifecycle event,
-   Candidate event, and Canon transaction event.
-5. Verify each record `integrity`, global `sequence`, and `previous_event`
-   linkage through the manifest's durable sequence.
-6. Verify every present raw, representation, and Canon snapshot object against
-   its SHA-256 path. Do not flag an intentional reference-only absence.
-7. Resolve prepared Canon transactions:
-   - if a matching committed event exists, ensure current Canon equals its after
-     snapshot;
-   - if no commit exists, deterministically restore the before snapshot or finish
-     the documented commit protocol;
-   - record the recovery decision as a new event when the recovered writer is
-     available.
-8. Verify current Canon against the latest committed transaction and validate
-   semantic IDs, Claim references, typed Evidence requirements, supersession,
-   sensitivity, and temporal fields.
-9. Fold each capture and its lifecycle events to reconstruct effective payload
-   state and representations.
-10. Delete or omit all `runtime/` state and run `lifedb rebuild`.
-11. Confirm the runtime watermark reaches the restored durable sequence and is
-    not dirty.
-12. Run known lexical searches over Canon Claims, readable Evidence, and a
-    retained textual representation.
-13. Build an authenticated Context Pack and verify Core, character budgets,
-    untrusted-content delimiters, sensitivity filtering, and watermark.
-14. Inspect pending manual Candidates without promoting them.
-15. Record the drill date, backup generation, durable sequence, software
-    version, duration, recovery actions, and failures.
+## 復旧手順
 
-Recovery should be tested periodically, after every durable-format migration,
-and after changes to backup, retention, authentication, or encryption policy.
+1. リポジトリ、または対応v0.2仕様・スキーマ・マイグレーションを復元する。
+2. durableバックアップを新規の空ディレクトリに復元する。
+3. 保管庫内容を実行する前に外部バックアップマニフェストを検証する。
+4. `vault.json`、全Canon文書、取得記録、ライフサイクルイベント、Candidate（候補）イベント、Canonトランザクションイベントを検証する。
+5. 各記録の`integrity`、全体`sequence`、`previous_event`連結をマニフェストのdurable連番通りに検証する。
+6. 存在する全raw・表現物・CanonスナップショットオブジェクトをSHA-256パスに照らして検証する。意図的なreference-onlyの欠落を異常としないこと。
+7. 準備済みCanonトランザクションを解決する。
+   - 対応確定イベントがあれば、現行Canonがその後スナップショットに等しいことを確保する。
+   - 確定がなければ、決定論的に前スナップショットを復元するか、文書化された確定手続きを完遂する。
+   - 復旧したライターが利用できる場合、復旧判定を新規イベントとして記録する。
+8. 現行Canonを最新確定トランザクションに照らして検証し、セマンティックID、Claim（主張）参照、型付きEvidence要件、置換、感度、時間フィールドを検証する。
+9. 各取得記録とそのライフサイクルイベントを畳み込み、実効ペイロード状態と表現物を再構築する。
+10. 全`runtime/`状態を削除または除外し、`lifedb rebuild`を実行する。
+11. ランタイムウォーターマークが復元したdurable連番に到達し、ダーティでないことを確認する。
+12. Canon Claim、可読Evidence、保持テキスト表現物に対する既知語彙検索を実行する。
+13. 認証済みContext Pack（コンテキストパック）を構築し、Core、文字数予算、信頼できない内容の区切り、感度選別、ウォーターマークを検証する。
+14. 保留中の手動Candidateを昇格せずに点検する。
+15. 訓練日、バックアップ世代、durable連番、ソフトウェア版、所要時間、復旧操作、失敗を記録する。
 
-## Runtime deletion drill
+復旧は定期的、durable形式マイグレーションのたび、バックアップ・保持・認証・暗号化方針の変更のたびに試験すべきである。
 
-Stop the server first. Use the guarded runtime command against the exact
-initialized vault; it refuses broad, symlinked, or uninitialized targets:
+## runtime削除訓練
+
+先にサーバーを止めること。初期化済みの厳密な保管庫を対象とする保護付きランタイムコマンドを使う。広範な対象、シンボリックリンク、未初期化の対象は拒否する。
 
 ```sh
 docker compose down
@@ -101,79 +73,53 @@ docker compose run --rm lifedb rebuild
 docker compose run --rm lifedb validate
 ```
 
-The command only targets `runtime/`; the operator must use the exact configured
-vault path and must not substitute a broad path, home directory, or unresolved
-environment variable. This is an explicit destructive operation against
-disposable state, not a general filesystem deletion recipe.
+コマンドは`runtime/`のみを対象とする。運用者は厳密に設定済みの保管庫パスを使い、広範なパス、ホームディレクトリ、未解決環境変数に置換してはならない。これは使い捨て状態に対する明示的な破壊操作であり、汎用ファイルシステム削除手順ではない。
 
-After rebuild, `indexed_sequence` equals `durable_sequence`, `dirty` is false,
-and search and Context authorization produce the expected results.
+再構築後、`indexed_sequence`は`durable_sequence`に等しく、`dirty`は偽であり、検索とContext認可は期待どおりに動作する。
 
-## Canon rollback drill
+ランタイムインデックスSQLiteは、検証済み記述子に対するLinux `/proc/self/fd`経由で開き、その仕組みが利用不可または利用不能の場合はパス解決したデータベースを使わず、操作を拒んでフェールクローズする。復旧は適合ホスト上で文書化された形式から実行でき、実装を越えた可搬性は約束しない。
 
-At least one recovery drill per release exercises a non-sensitive fixture:
+## Canonロールバック訓練
 
-1. create a manual Candidate;
-2. promote it through `canon.change-prepared` and
-   `canon.change-committed`;
-3. verify both snapshot objects;
-4. invoke rollback;
-5. verify `canon.rollback-prepared` and `canon.rollback-committed`;
-6. verify Canon bytes match the original before snapshot;
-7. verify both the original and compensating transaction remain auditable.
+リリースごとに少なくとも一度の復旧訓練では、機微情報を含まないフィクスチャを扱う。
 
-An interrupted prepared transaction fixture is also required so recovery does not
-depend only on the successful path.
+1. 手動Candidateを作成する。
+2. `canon.change-prepared`と`canon.change-committed`で昇格する。
+3. 両スナップショットオブジェクトを検証する。
+4. ロールバックを呼び出す。
+5. `canon.rollback-prepared`と`canon.rollback-committed`を検証する。
+6. Canonバイト列が元の前スナップショットに一致することを検証する。
+7. 元のトランザクションと補償トランザクションの両方が監査可能のままであることを検証する。
 
-## Retention and erasure recovery
+中断された準備済みトランザクションのフィクスチャも必須とし、復旧が成功経路のみに依存しないようにする。
 
-Ordinary retention apply records payload lifecycle events. After restore, the
-effective view must agree with the restored object set. A missing object whose
-effective state is `present` is corruption; an absent object whose effective
-state is `evicted`, `redacted`, or validly `external` is not automatically
-corruption.
+## 保持・消去の復旧
 
-Before validation after an unclean shutdown, run `lifedb retention recover`.
-It restores exact quarantined objects and appends compensating restoration and
-abort events for prepared-only retention transactions; for committed
-transactions it removes leftover quarantine bytes. It does not infer or apply a
-new retention plan.
+通常保持適用はペイロードライフサイクルイベントを記録する。復元後、実効ビューは復元オブジェクト集合と一致しなければならない。実効状態が`present`の欠落オブジェクトは破損であり、実効状態が`evicted`、`redacted`、または正当な`external`の欠落オブジェクトは自動的な破損ではない。
 
-The v0.2 reference implements retention `preview`, exact-confirmation `apply`,
-and interrupted-apply `recover` as explicit CLI operations. Recovery does not
-make retention automatic or scheduled; it only reconciles an already-started
-manual apply.
+異常停止後の検証に先立ち、`lifedb retention recover`を実行する。準備のみの保持トランザクションについてquarantine内のオブジェクトを厳密に復元し、補償復元・中止イベントを追記する。確定済みトランザクションについてはquarantine残分バイト列を除去する。新規保持計画を推測も適用もしない。
 
-Owner-authorized erasure may intentionally remove records, snapshot bytes, or
-history needed for an as-of view. The recovery report must distinguish an
-authorized erasure boundary from unexplained loss whenever a permitted erasure
-receipt or backup policy provides that information.
+v0.2リファレンスは保持`preview`、厳密確認`apply`、中断適用`recover`を明示CLI操作で実装する。復旧は保持を自動にも定期実行にもしない。開始済み手動適用の照合のみを行う。
 
-Owner-erasure execution is not implemented by the v0.2 reference software; this
-paragraph defines recovery requirements for a future conforming implementation.
+所有者承認の消去は、時点履歴に要する記録、スナップショットバイト列、履歴を意図的に除去し得る。復旧報告は、許可された消去受領証またはバックアップ方針がその情報を与える場合、認可消去境界と原因不明の損失を区別しなければならない。
 
-LifeDB cannot erase offline or provider-managed backup copies by itself. The
-deployment operator owns backup inventory, deletion and expiry, and preventing a
-restore from reintroducing erased material. If an old generation must be
-retained, that limitation is disclosed to the owner during erasure preview.
+所有者消去実行はv0.2リファレンスソフトウェアが実装しない。本段落は将来の適合実装向け復旧要件を定める。
 
-## Git is not a complete backup
+LifeDBはオフラインまたは事業者管理バックアップ複製を自ら消去できない。バックアップ在庫、削除・有効期限、消去済み資料を再導入する復元の防止は配置運用者の責務である。古い世代を保持しなければならない場合、その制限は消去プレビュー時に所有者へ開示する。
 
-Git is useful for reviewing Canon prose, but Canon transaction events and exact
-before/after snapshot objects are the LifeDB rollback contract. A Git repository
-does not include high-volume Evidence or Objects by default and may have
-rewriteable history.
+## Gitは完全バックアップではない
 
-A repository mirror is not a complete LifeDB backup unless it includes the full
-required backup set and a consistent durable-sequence manifest.
+GitはCanon散文の閲覧に有用だが、Canonトランザクションイベントと厳密な前後スナップショットオブジェクトがLifeDBロールバック契約である。Gitリポジトリは既定で大容量EvidenceやObjectsを含まず、履歴の書換えがあり得る。
 
-## Release gate
+必須バックアップ一式の全体と一貫したdurable連番マニフェストを含まない限り、リポジトリミラーは完全なLifeDBバックアップではない。
 
-A v0.2 release is not recoverability-verified until:
+## リリースゲート
 
-- all unit and integration tests pass;
-- a Docker-capable host completes the runtime deletion drill;
-- a fresh target completes the full restore procedure;
-- a Canon rollback and interrupted-preparation fixture recover correctly;
-- reference-only absence and retained-representation search are tested;
-- authentication and sensitivity checks still hold after rebuild.
+v0.2リリースは、以下まで復旧可能性検証済みではない。
+
+- 全単体テストと結合テストが通ること。
+- Docker利用可能なホストがruntime削除訓練を完遂すること。
+- 新規の対象が完全な復元手順を完遂すること。
+- Canonロールバックと準備中断フィクスチャが正しく復旧すること。
+- reference-onlyの欠落と保持表現物の検索を試験すること。
+- 再構築後も認証と感度検査が有効であること。

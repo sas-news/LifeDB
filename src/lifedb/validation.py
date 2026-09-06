@@ -19,8 +19,9 @@ from .evidence import (
     read_event,
 )
 from .ids import is_uuid7
-from .markdown import canon_documents
+from .markdown import MAX_MARKDOWN_BYTES, canon_documents
 from .policies import PolicyError, load_context_policy, load_retention_policy
+from .secrets import detect_credentials
 from .storage import file_lock, read_bounded_regular_file, strict_json_loads
 from .schema_validation import schema_errors
 
@@ -371,6 +372,8 @@ def _validate_claim(
     if not isinstance(claim, Mapping):
         _error(report, location, "Claim must be a mapping")
         return None, [], None
+    if "confidence" in claim:
+        _error(report, f"{location}.confidence", "numeric model confidence must not be stored in Canon")
     required = {
         "id", "subject", "predicate", "object", "statement", "basis",
         "certainty", "state", "observed_at", "evidence",
@@ -795,6 +798,17 @@ def _validate_vault_unlocked(root: Path, verify_hashes: bool = True) -> Validati
         for document in canon_documents(root / "canon"):
             report.canon_documents += 1
             rel = document.path.relative_to(root).as_posix()
+            try:
+                raw = read_bounded_regular_file(
+                    root / rel, max_bytes=MAX_MARKDOWN_BYTES, boundary=root
+                )
+            except (OSError, ValueError):
+                _error(report, rel, "Canon document could not be scanned safely")
+            else:
+                findings = detect_credentials(raw)
+                if findings:
+                    names = ", ".join(sorted({finding.detector for finding in findings}))
+                    _error(report, rel, f"Canon document looks like credential material ({names}); manual edit refused")
             fm = document.frontmatter
             _schema_check("canon", fm, rel, root, report)
             extension = fm.get("x-lifedb")
