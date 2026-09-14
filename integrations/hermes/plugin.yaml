@@ -1,0 +1,25 @@
+name: lifedb-bridge
+version: 0.1.0
+description: "Standalone LifeDB bridge hooks for completed Hermes turns."
+author: LifeDB
+hooks:
+  - pre_llm_call
+  - post_llm_call
+  - on_session_end
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+  - on_session_end
+config_schema:
+  url: {type: str, default: "http://127.0.0.1:7331", description: "LifeDB base URL"}
+  token_file: {type: str, default: "", description: "Protected token file"}
+  timeout_seconds: {type: float, default: 2.0, description: "HTTP deadline"}
+  max_response_bytes: {type: int, default: 1048576, description: "Response limit"}
+  max_request_bytes: {type: int, default: 4194304, description: "Request limit"}
+  workspace: {type: str, default: "", description: "Absolute workspace override"}
+  sensitivity_ceiling: {type: str, default: "", description: "Context sensitivity ceiling"}
+  budget_chars: {type: int, default: 12000, description: "Context budget"}
+  core_chars: {type: int, default: 4000, description: "Core budget"}
+  continuity_chars: {type: int, default: 2000, description: "Continuity budget"}
+  relevant_chars: {type: int, default: 6000, description: "Relevant budget"}
+  limit: {type: int, default: 8, description: "Context result limit"}
