@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "docs_compose.py"
+RUNTIME_UID_GID = f"{os.getuid()}:{os.getgid()}"
 
 
 def load_module():
@@ -43,7 +45,7 @@ class StrictFakeRunner:
     def inspect(self, container_id: str) -> str:
         self.assert_owned(container_id)
         return json.dumps([{
-            "Config": {"User": "1000:1000"},
+            "Config": {"User": RUNTIME_UID_GID},
             "HostConfig": {
                 "ReadonlyRootfs": True,
                 "CapDrop": ["ALL"],
@@ -75,7 +77,7 @@ class DocsComposeTest(unittest.TestCase):
     def test_inspect_parser_rejects_wrong_security_and_mount_contract(self) -> None:
         module = load_module()
         raw = StrictFakeRunner(module).inspect("cid-task16")
-        expected = module.InspectExpectation("/tmp/vault", "/tmp/token", "17431", "1000:1000")
+        expected = module.InspectExpectation("/tmp/vault", "/tmp/token", "17431", RUNTIME_UID_GID)
         module.parse_inspect(raw, expected)
         for key, value in (("Config", {"User": "0:0"}), ("HostConfig", {"ReadonlyRootfs": False})):
             decoded = json.loads(raw)
