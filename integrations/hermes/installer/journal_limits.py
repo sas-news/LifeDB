@@ -1,0 +1,5 @@
+from __future__ import annotations
+
+MAX_CONFIG_BYTES = 1_048_576
+MAX_MARKER_BYTES = 1_048_576
+MAX_JOURNAL_BYTES = 4_194_304
