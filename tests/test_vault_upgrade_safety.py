@@ -7,13 +7,13 @@ import threading
 import unittest
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
 from unittest import mock
 
 from lifedb.markdown import parse_markdown
 from lifedb.schema_validation import SCHEMA_FILES, schema_path
 from lifedb.secrets import SecretDetectedError
 from lifedb.storage import strict_json_loads
+from lifedb._server_types import JSONMapping
 from lifedb.vault import (
     DURABLE_TOP_LEVEL,
     MAX_SOURCE_METADATA_BYTES,
@@ -21,6 +21,7 @@ from lifedb.vault import (
     Vault,
     parse_time,
 )
+from lifedb.vault_objects import VaultObjectsMixin
 
 
 class VaultUpgradeSafetyTest(unittest.TestCase):
@@ -30,6 +31,29 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_marker_binding_is_authoritative_and_patchable(self) -> None:
+        self.assertNotIn("mark_index_dirty", VaultObjectsMixin.__dict__)
+        self.assertIs(Vault.__dict__["mark_dirty"], Vault.__dict__["mark_index_dirty"])
+        vault = Vault(self.root)
+        vault.init()
+        with mock.patch("lifedb.vault.durable_touch") as touched:
+            self.assertTrue(vault.mark_dirty(reason="characterization"))
+        touched.assert_called_once()
+
+    def test_marker_programming_failure_is_not_silenced(self) -> None:
+        vault = Vault(self.root)
+        vault.init()
+        with mock.patch("lifedb.vault.durable_touch", side_effect=RuntimeError("programming failure")):
+            with self.assertRaisesRegex(RuntimeError, "programming failure"):
+                vault.mark_index_dirty(reason="unexpected")
+
+    def test_private_json_helpers_remain_module_compatible(self) -> None:
+        from lifedb.vault import _reject_duplicate_json_keys, _reject_json_constant
+
+        self.assertEqual(_reject_duplicate_json_keys([("key", "value")]), {"key": "value"})
+        with self.assertRaisesRegex(ValueError, "non-finite JSON value"):
+            _reject_json_constant("NaN")
 
     def test_upgrade_prefers_current_versioned_schema_and_keeps_stale_flat_copy(self) -> None:
         (self.root / "schemas").mkdir(parents=True)
@@ -116,8 +140,9 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
         self.assertFalse((real_parent / "outside").exists())
 
     def test_parse_time_rejects_non_strings_explicitly(self) -> None:
-        with self.assertRaises(TypeError):
-            parse_time(123)  # type: ignore[arg-type]
+        with mock.patch("lifedb.vault.parse_time", wraps=parse_time) as parse_time_spy:
+            with self.assertRaises(TypeError):
+                parse_time_spy(123)
 
     def test_source_metadata_has_bounded_canonical_utf8_representation(self) -> None:
         vault = Vault(self.root)
@@ -279,7 +304,7 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
         real_read = Vault._read_metadata_at
         real_ensure = Vault._ensure_directory_at
 
-        def gated_read(self_vault: Vault, root_fd: int) -> dict[str, Any] | None:
+        def gated_read(self_vault: Vault, root_fd: int) -> JSONMapping | None:
             result = real_read(self_vault, root_fd)
             if result is None:
                 barrier.wait(timeout=10)
@@ -295,7 +320,7 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
             mock.patch.object(Vault, "_ensure_directory_at", new=classmethod(locked_ensure)),
             ThreadPoolExecutor(max_workers=2, thread_name_prefix="vault-init") as executor,
         ):
-            futures: dict[str, Future[dict[str, Any]]] = {
+            futures: dict[str, Future[JSONMapping]] = {
                 "first": executor.submit(first.init),
                 "second": executor.submit(second.init),
             }
@@ -321,7 +346,7 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
     @staticmethod
     def _run_concurrent_inits(
         first: Vault, second: Vault
-    ) -> dict[str, Future[dict[str, Any]]]:
+    ) -> dict[str, Future[JSONMapping]]:
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="vault-init") as executor:
             return {
                 "first": executor.submit(first.init),
@@ -330,7 +355,7 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
 
     @staticmethod
     def _concurrent_init_failures(
-        futures: dict[str, Future[dict[str, Any]]],
+        futures: dict[str, Future[JSONMapping]],
     ) -> dict[str, BaseException]:
         failures: dict[str, BaseException] = {}
         for name, future in futures.items():
@@ -340,7 +365,7 @@ class VaultUpgradeSafetyTest(unittest.TestCase):
         return failures
 
     def _assert_converged_on_committed_metadata(
-        self, futures: dict[str, Future[dict[str, Any]]]
+        self, futures: dict[str, Future[JSONMapping]]
     ) -> None:
         metadatas = {
             name: future.result(timeout=30) for name, future in futures.items()

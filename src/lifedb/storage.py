@@ -10,6 +10,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from ._server_types import JSONValue
+
 try:  # pragma: no cover - exercised only on platforms without fcntl
     import fcntl
 except ImportError:  # pragma: no cover
@@ -56,7 +58,7 @@ def _reject_json_constant(_value: str) -> None:
     raise ValueError("JSON number must be finite")
 
 
-def strict_json_loads(payload: bytes, *, max_bytes: int) -> Any:
+def strict_json_loads(payload: bytes, *, max_bytes: int) -> JSONValue:
     """Decode bounded UTF-8 JSON without ambiguous or non-finite data.
 
     Duplicate object names are rejected at every nesting level. Errors are

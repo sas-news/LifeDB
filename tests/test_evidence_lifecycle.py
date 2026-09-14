@@ -11,7 +11,7 @@ from unittest import mock
 from lifedb.evidence import iter_capture_paths, read_capture, read_event, verify_integrity
 from lifedb.ids import new_id
 from lifedb.storage import durable_write_json
-from lifedb.vault import Vault
+from lifedb.vault import ExternalIDConflictError, Vault
 
 
 class EvidenceLifecycleTest(unittest.TestCase):
@@ -84,6 +84,42 @@ class EvidenceLifecycleTest(unittest.TestCase):
                 source_kind="collector",
                 external_id="event-42",
             )
+
+    def test_external_id_conflict_raises_typed_valueerror_subclass(self) -> None:
+        self.assertTrue(issubclass(ExternalIDConflictError, ValueError))
+
+        first = self.vault.ingest(
+            b"typed conflict probe",
+            source_kind="collector",
+            external_id="typed-event-7",
+        )
+        replay = self.vault.ingest(
+            b"typed conflict probe",
+            source_kind="collector",
+            external_id="typed-event-7",
+        )
+        self.assertEqual(replay["id"], first["id"])
+        self.assertEqual(
+            len(list(self.root.glob("evidence/collector/*/*/*/*.json"))), 1
+        )
+
+        captures_before = len(list(self.root.glob("evidence/collector/*/*/*/*.json")))
+        objects_before = len(list((self.root / "objects").rglob("*")))
+        with self.assertRaises(ExternalIDConflictError) as raised:
+            self.vault.ingest(
+                b"typed conflict probe changed",
+                source_kind="collector",
+                external_id="typed-event-7",
+            )
+        self.assertIsInstance(raised.exception, ValueError)
+        self.assertNotIn("typed conflict probe changed", str(raised.exception))
+        self.assertEqual(
+            len(list(self.root.glob("evidence/collector/*/*/*/*.json"))),
+            captures_before,
+        )
+        self.assertEqual(
+            len(list((self.root / "objects").rglob("*"))), objects_before
+        )
 
     def test_uuid_lookup_and_object_digest_are_strict(self) -> None:
         for invalid in ("*", "../escape", "0" * 64, new_id().upper()):
