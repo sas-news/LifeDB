@@ -144,6 +144,8 @@ class Task15ContractTests(unittest.TestCase):
         self.assertIn("BUN_BIN=$(resolve_tool bun)", python_stage)
         self.assertIn('SAFE_PATH="$(dirname "$BUN_BIN"):$SAFE_PATH"', python_stage)
         self.assertIn('"$(clean_env "$BUN_BIN" --version)" == 1.4.0', python_stage)
+        self.assertIn('(cd "$ROOT/integrations/opencode" && clean_env "$BUN_BIN" ci)', python_stage)
+        self.assertLess(python_stage.index('clean_env "$BUN_BIN" ci'), python_stage.index("unittest discover"))
 
     def test_unsafe_direct_tool_directory_stays_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="task15-direct-tool-") as directory:
