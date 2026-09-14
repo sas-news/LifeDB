@@ -8,11 +8,30 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
-from scripts.docs_adapters import AdapterReceipt, adapter_scenario, _run
+from scripts.docs_adapters import AdapterReceipt, _env, _run, adapter_scenario
 
 
 class DocsAdapterScenarioTests(unittest.TestCase):
+    def test_env_composes_safe_path_entries_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            private_bin = root / "private-bin"
+            home = root / "home"
+            xdg = root / "xdg"
+            hermes = root / "hermes"
+            bun = root / "bun" / "bin" / "bun"
+            with patch("scripts.docs_adapters.shutil.which", return_value=str(bun)):
+                environment = _env(root, home, xdg, hermes, private_bin)
+
+        self.assertEqual(
+            environment["PATH"].split(":"),
+            [str(private_bin), str(bun.parent), str(Path(sys.executable).parent), "/usr/bin"],
+        )
+        self.assertNotIn("/usr/local/sbin", environment["PATH"])
+        self.assertNotIn("/usr/local/bin", environment["PATH"])
+
     def test_external_sigint_terminates_and_reaps_child_repeatedly(self) -> None:
         parent_code = "from pathlib import Path; import os, signal, sys; from scripts.docs_adapters import _run; _run([sys.executable, '-c', 'from pathlib import Path; import os, signal, sys; Path(sys.argv[1]).write_text(str(os.getpid())); signal.pause()', sys.argv[1]], Path.cwd(), os.environ.copy(), timeout=30)"
         for _ in range(2):

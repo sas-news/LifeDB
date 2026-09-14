@@ -91,7 +91,7 @@ def _env(root: Path, home: Path, xdg: Path, hermes: Path, private_bin: Path) -> 
     bun = shutil.which("bun")
     if bun is None:
         raise AdapterScenarioError("bun is unavailable")
-    path = ":".join((str(private_bin), str(Path(bun).parent), str(Path(sys.executable).parent), "/usr/local/sbin", "/usr/local/bin", "/usr/bin"))
+    path = ":".join((str(private_bin), str(Path(bun).parent), str(Path(sys.executable).parent), "/usr/bin"))
     return {"HOME": str(home), "XDG_CONFIG_HOME": str(xdg), "HERMES_HOME": str(hermes), "PATH": path, "PYTHONPATH": str(root), "LANG": "C", "LC_ALL": "C"}
 
 
