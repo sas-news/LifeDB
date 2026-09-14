@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import tarfile
@@ -47,11 +48,20 @@ class Task15ContractTests(unittest.TestCase):
         jobs = parsed_workflow()
         self.assertEqual(yaml.safe_load(WORKFLOW.read_text())["permissions"], {"contents": "read"})
         for stage in ("python", "hermes", "package-smoke", "docker"):
-            actions = [step.get("uses") for step in steps(jobs[stage])]
+            job_steps = steps(jobs[stage])
+            actions = [step.get("uses") for step in job_steps]
             self.assertIn("actions/setup-python@v7", actions)
             self.assertIn("astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d", actions)
-            sync = [step.get("run") for step in steps(jobs[stage]) if step.get("run") == "uv sync --locked --python 3.13" or "matrix.python-version" in str(step.get("run"))]
+            setup_uv = next(step for step in job_steps if step.get("uses", "").startswith("astral-sh/setup-uv@"))
+            self.assertEqual(setup_uv["id"], "setup-uv")
+            runner = next(step for step in job_steps if step.get("run") == f"./scripts/ci-equivalent.sh {stage}")
+            self.assertEqual(runner["env"]["LIFEDB_SETUP_UV_PATH"], "${{ steps.setup-uv.outputs.uv-path }}")
+            sync = [step.get("run") for step in job_steps if step.get("run") == "uv sync --locked --python 3.13" or "matrix.python-version" in str(step.get("run"))]
             self.assertTrue(any("uv sync --locked" in str(command) for command in sync))
+        python_actions = [step.get("uses") for step in steps(jobs["python"])]
+        self.assertIn("oven-sh/setup-bun@v2", python_actions)
+        python_bun = next(step for step in steps(jobs["python"]) if step.get("uses") == "oven-sh/setup-bun@v2")
+        self.assertEqual(python_bun["with"]["bun-version"], "1.4.0")
         opencode = steps(jobs["opencode"])
         bun = next(step for step in opencode if step.get("uses") == "oven-sh/setup-bun@v2")
         self.assertEqual(bun["with"]["bun-version"], "1.4.0")
@@ -114,6 +124,53 @@ class Task15ContractTests(unittest.TestCase):
             self.assertIn(marker, source)
         self.assertNotIn("docker ps -aq", source)
         self.assertNotIn("container_prefix}-", source)
+
+    def test_hosted_uv_is_staged_into_private_tools_directory(self) -> None:
+        source = RUNNER.read_text()
+        self.assertIn('LIFEDB_SETUP_UV_PATH', source)
+        self.assertIn('[[ "$LIFEDB_SETUP_UV_PATH" == /* && -f "$LIFEDB_SETUP_UV_PATH"', source)
+        self.assertIn('-f "$LIFEDB_SETUP_UV_PATH" && ! -L "$LIFEDB_SETUP_UV_PATH" && -x "$LIFEDB_SETUP_UV_PATH"', source)
+        self.assertIn('mktemp -d "$TMP_ROOT/', source)
+        self.assertIn('chmod 700 "$STAGED_TOOLS_DIR"', source)
+        self.assertIn('cp -- "$LIFEDB_SETUP_UV_PATH"', source)
+        self.assertIn('chmod 700 "$STAGED_TOOLS_DIR/uv"', source)
+        self.assertIn('STAGED_TOOLS_DIR', source)
+        self.assertNotIn('"$path" == /opt/hostedtoolcache/*', source)
+        self.assertNotIn('"$canonical" == /opt/hostedtoolcache/*', source)
+
+    def test_python_stage_resolves_and_verifies_bun(self) -> None:
+        source = RUNNER.read_text()
+        python_stage = source.split("python_stage()", 1)[1].split("opencode_stage()", 1)[0]
+        self.assertIn("BUN_BIN=$(resolve_tool bun)", python_stage)
+        self.assertIn('SAFE_PATH="$(dirname "$BUN_BIN"):$SAFE_PATH"', python_stage)
+        self.assertIn('"$(clean_env "$BUN_BIN" --version)" == 1.4.0', python_stage)
+
+    def test_unsafe_direct_tool_directory_stays_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="task15-direct-tool-") as directory:
+            root = Path(directory)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            fake = fake_bin / "bun"
+            fake.write_text("#!/bin/sh\nexit 0\n")
+            fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+            environment = dict(os.environ)
+            environment.update({"PATH": f"{fake_bin}:/usr/bin:/bin", "TMPDIR": str(root / "caller-tmp")})
+            result = subprocess.run((str(RUNNER), "opencode"), cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("unapproved tool", result.stderr)
+
+    def test_private_staged_uv_source_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="task15-staged-uv-") as directory:
+            source = Path(directory) / "uv"
+            uv_path = shutil.which("uv")
+            if uv_path is None:
+                self.fail("uv must be visible to the test process")
+            shutil.copy2(uv_path, source)
+            source.chmod(source.stat().st_mode | stat.S_IXUSR)
+            environment = dict(os.environ)
+            environment.update({"LIFEDB_SETUP_UV_PATH": str(source), "PATH": "/usr/bin:/bin"})
+            result = subprocess.run((str(RUNNER), "package-smoke"), cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def _python(self) -> Path:
         return ROOT / ".venv" / "bin" / "python"

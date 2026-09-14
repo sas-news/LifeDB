@@ -20,12 +20,18 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - id: setup-uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --python "${{ matrix.python-version }}"
       - run: ./scripts/ci-equivalent.sh python
+        env:
+          LIFEDB_SETUP_UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
 
   opencode:
     runs-on: ubuntu-latest
@@ -47,12 +53,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - id: setup-uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --python 3.13
       - run: ./scripts/ci-equivalent.sh hermes
+        env:
+          LIFEDB_SETUP_UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
 
   package-smoke:
     runs-on: ubuntu-latest
@@ -63,12 +72,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - id: setup-uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --python 3.13
       - run: ./scripts/ci-equivalent.sh package-smoke
+        env:
+          LIFEDB_SETUP_UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
 
   docker:
     runs-on: ubuntu-latest
@@ -80,9 +92,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - id: setup-uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --python 3.13
       - run: ./scripts/ci-equivalent.sh docker
+        env:
+          LIFEDB_SETUP_UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
