@@ -49,7 +49,7 @@ class Task15ContractTests(unittest.TestCase):
         for stage in ("python", "hermes", "package-smoke", "docker"):
             actions = [step.get("uses") for step in steps(jobs[stage])]
             self.assertIn("actions/setup-python@v7", actions)
-            self.assertIn("astral-sh/setup-uv@v10", actions)
+            self.assertIn("astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d", actions)
             sync = [step.get("run") for step in steps(jobs[stage]) if step.get("run") == "uv sync --locked --python 3.13" or "matrix.python-version" in str(step.get("run"))]
             self.assertTrue(any("uv sync --locked" in str(command) for command in sync))
         opencode = steps(jobs["opencode"])
