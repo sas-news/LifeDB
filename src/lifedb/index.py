@@ -16,6 +16,7 @@ from .markdown import MarkdownDocument, canon_documents
 from .objectio import ObjectReadError, read_object_prefix
 from .storage import file_lock, fsync_directory
 from .vault import Vault, utc_now
+from ._server_types import JSONMapping
 
 
 INDEX_SCHEMA = "0.2"
@@ -1222,7 +1223,7 @@ def _search_locked(
     *,
     limit: int = 10,
     sensitivity_ceiling: str = "personal",
-) -> list[dict[str, Any]]:
+) -> list[JSONMapping]:
     if index_watermark(vault)["dirty"]:
         rebuild_index(vault)
     ceiling = SENSITIVITY_ORDER[sensitivity_ceiling]
@@ -1331,7 +1332,7 @@ def search(
     *,
     limit: int = 10,
     sensitivity_ceiling: str = "personal",
-) -> list[dict[str, Any]]:
+) -> list[JSONMapping]:
     """Search one coherent durable snapshot under the writer boundary."""
     query, limit, sensitivity_ceiling = _validate_search(query, limit, sensitivity_ceiling)
     with file_lock(

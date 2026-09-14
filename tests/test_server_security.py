@@ -22,7 +22,7 @@ from lifedb.auth import (
 )
 from lifedb.index import rebuild_index
 from lifedb.server import MAX_BODY_BYTES, LifeDBHandler, LifeDBServer
-from lifedb.vault import Vault
+from lifedb.vault import ExternalIDConflictError, Vault
 
 
 class LifeDBHTTPTestCase(unittest.TestCase):
@@ -318,6 +318,61 @@ class LifeDBHTTPTestCase(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         self.assertEqual(raised["sensitivity"], "sensitive")
+
+    def test_ingest_external_id_conflict_stays_backward_compatible(self) -> None:
+        status, record, _ = self.request(
+            "/v1/ingest",
+            body=b"typed http replay",
+            headers={
+                "Content-Type": "text/plain",
+                "X-LifeDB-External-ID": "typed-http-event-9",
+                "X-LifeDB-Sensitivity": "public",
+            },
+        )
+        self.assertEqual(status, 201)
+
+        status, replay, _ = self.request(
+            "/v1/ingest",
+            body=b"typed http replay",
+            headers={
+                "Content-Type": "text/plain",
+                "X-LifeDB-External-ID": "typed-http-event-9",
+                "X-LifeDB-Sensitivity": "public",
+            },
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(replay["id"], record["id"])
+
+        status, conflict, _ = self.request(
+            "/v1/ingest",
+            body=b"typed http replay changed",
+            headers={
+                "Content-Type": "text/plain",
+                "X-LifeDB-External-ID": "typed-http-event-9",
+                "X-LifeDB-Sensitivity": "public",
+            },
+        )
+        self.assertEqual(status, 400)
+
+        with self.assertRaises(ExternalIDConflictError):
+            self.vault.ingest(
+                b"typed http replay changed",
+                source_kind="http",
+                source_metadata={
+                    "transport": "http",
+                    "authenticated_principal": "test-http-principal",
+                },
+                external_id="typed-http-direct-9",
+            )
+            self.vault.ingest(
+                b"typed http replay changed again",
+                source_kind="http",
+                source_metadata={
+                    "transport": "http",
+                    "authenticated_principal": "test-http-principal",
+                },
+                external_id="typed-http-direct-9",
+            )
 
     def test_internal_exception_details_are_not_returned(self) -> None:
         with mock.patch(

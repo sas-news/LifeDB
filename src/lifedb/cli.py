@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from .candidates import CandidateStore
+from .auth import resolve_api_token_from_env
 from .context import build_context
 from .expansion import ROLE_RE as EXPANSION_ROLE_RE, expand_evidence
 from .index import index_watermark, rebuild_index, search
@@ -444,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return 0
         if args.command == "serve":
-            token = os.environ.get("LIFEDB_API_TOKEN")
+            token = resolve_api_token_from_env()
             serve(
                 vault,
                 args.bind,
