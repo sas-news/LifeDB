@@ -168,7 +168,7 @@ class Task15ContractTests(unittest.TestCase):
             shutil.copy2(uv_path, source)
             source.chmod(source.stat().st_mode | stat.S_IXUSR)
             environment = dict(os.environ)
-            environment.update({"LIFEDB_SETUP_UV_PATH": str(source), "PATH": "/usr/bin:/bin"})
+            environment.update({"LIFEDB_SETUP_UV_PATH": str(source), "PATH": f"{source.parent}:/usr/bin:/bin"})
             result = subprocess.run((str(RUNNER), "package-smoke"), cwd=ROOT, env=environment, capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
 
