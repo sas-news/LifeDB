@@ -67,13 +67,17 @@ LifeDB記録・オブジェクトダイジェストは既知バイト列への�
 先にサーバーを止めること。初期化済みの厳密な保管庫を対象とする保護付きランタイムコマンドを使う。広範な対象、シンボリックリンク、未初期化の対象は拒否する。
 
 ```sh
-docker compose down
-docker compose run --rm lifedb runtime reset --confirm DELETE-RUNTIME
-docker compose run --rm lifedb rebuild
-docker compose run --rm lifedb validate
+# The wrapper loads the repository .env without shell evaluation; process
+# environment values override .env. The token file must be exact mode 0600.
+python scripts/lifedb-compose.py down
+python scripts/lifedb-compose.py run --rm lifedb runtime reset --confirm DELETE-RUNTIME
+python scripts/lifedb-compose.py run --rm lifedb rebuild
+python scripts/lifedb-compose.py run --rm lifedb validate
 ```
 
 コマンドは`runtime/`のみを対象とする。運用者は厳密に設定済みの保管庫パスを使い、広範なパス、ホームディレクトリ、未解決環境変数に置換してはならない。これは使い捨て状態に対する明示的な破壊操作であり、汎用ファイルシステム削除手順ではない。
+
+復旧でも`lifedb-compose.py`以外のraw Compose経路を使わない。ラッパーは所有された`compose.yaml`とプロジェクトディレクトリを固定し、`-f`、`--env-file`、`--project-directory`、`COMPOSE_FILE`、`COMPOSE_ENV_FILES`を拒否する。分離した訓練は`-p`で一意のComposeプロジェクト名を指定する。
 
 再構築後、`indexed_sequence`は`durable_sequence`に等しく、`dirty`は偽であり、検索とContext認可は期待どおりに動作する。
 

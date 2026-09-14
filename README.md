@@ -1,5 +1,7 @@
 # LifeDB
 
+運用、適合条件、プライバシー境界、復旧、OpenCode/Hermes連携の唯一のコマンドソースは[operator guide](docs/operator-guide.md)です。関連仕様は[コンテキストプロトコル](docs/context-protocol.md)、[保持ポリシー](docs/retention.md)、[災害復旧](docs/disaster-recovery.md)、[脅威モデル](docs/threat-model.md)、[検証記録](docs/verification.md)を参照してください。ドキュメント検査は`make docs-smoke`です。
+
 LifeDBは、個人のためのローカルファーストでエージェント中立、復旧可能な記憶基盤です。Canon（カノン）は所有者が承認した現在のモデルです。Evidence（証跡）は観測または取得した内容を記録するものであり、真実としてのラベルは付けません。データベース、埋め込み、コンテナ、実効ビュー、Context Pack（コンテキストパック）は使い捨ての投影です。
 
 このリポジトリは、LifeDB v0.2の実行可能な仕様とリファレンス実装です。CanonバンドルはOKF v0.2を対象とし、パス非依存のUUIDv7アイデンティティと`x-lifedb`配下の型付きClaim（主張）来歴を追加しています。互換性の基準は[OKF v0.2仕様](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)です。
@@ -57,60 +59,23 @@ LifeDBは、個人のためのローカルファーストでエージェント�
 
 ## CLIクイックスタート
 
-独立したPython環境に導入し、実際の保管庫はソースリポジトリの外に置きます。
-
-```sh
-python -m pip install .
-export LIFEDB_VAULT=/absolute/path/to/lifedb-vault
-lifedb init
-printf '%s' 'LifeDB remains reconstructable from durable files.' \
-  | lifedb ingest - --media-type text/plain --filename memory.txt
-lifedb validate
-lifedb rebuild
-lifedb context 'What must remain reconstructable?' --markdown
-```
+独立したPython環境とリポジトリ外の保管庫を使う運用手順は[operator guide](docs/operator-guide.md)に集約しています。
 
 CLI呼び出しは現在のOSユーザーとして実行され、HTTP認証層を経由しません。ファイルシステム権限と暗号化ストレージで保管庫を保護します。
 
 明示的で有用なワークフローは次のとおりです。最初の例は、直近の会話EvidenceにContinuity経路指定ラベルを付けて取り込み、続きの問合せで辿れるようにします。次の例は、不変の表現物イベントを作成します。最後の例は、適格なrawペイロード退避をプレビューし、厳密確認付きで適用して中断時の回復まで行います。適用の権限を持つのは永続化済みの計画文書のみであり、画面表示は情報提供にすぎません。返された識別子と確認値は正確に写し取り、適用は永続化計画を再検証するため、durable状態が変わっていれば失敗します。
 
-```sh
-# Associate recent conversation Evidence with Continuity routing labels.
-printf '%s' 'Continue the migration after validation.' \
-  | lifedb ingest - --media-type text/plain --kind conversation \
-      --source-metadata '{"session":"session-42","workspace":"/srv/project"}'
-lifedb context 'What remains open?' --session session-42 \
-  --workspace /srv/project --markdown
-
-# Create an immutable representation event.
-lifedb evidence add-representation 019d0000-0000-7000-8000-000000000001 ocr.txt \
-  --role ocr --media-type text/plain --actor process:ocr \
-  --producer-version 1.0
-
-# Preview eligible raw-payload eviction. The persisted plan file under
-# runtime/retention/ is the apply authority; displayed output is
-# informational only. Copy the returned id and confirmation
-# exactly; apply revalidates the persisted plan and fails if durable state changed.
-lifedb retention preview
-lifedb retention apply 019d0000-0000-7000-8000-000000000002 \
-  --confirm 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' \
-  --actor owner:local
-lifedb retention recover
-```
+保持、Evidence、Context、Canon操作の正確なコマンドは[operator guide](docs/operator-guide.md)を参照してください。
 
 上のUUIDとダイジェストは仮の値です。新規保管庫では手動取り込みの既定が`durable`であり、通常の退避対象から意図的に除外します。`grace`または`derivative-only`でポリシー適合の取得のみ候補に現れます。
 
 ## Docker
 
-```sh
-cp .env.example .env
-mkdir -p ./vault
-docker compose run --rm lifedb init
-docker compose up -d --build lifedb
-curl http://127.0.0.1:7331/health
-```
+Composeの安全なbootstrap、check、up、ps、down、recoveryコマンドは[operator guide](docs/operator-guide.md)を参照してください。
 
-既定の配置はホスト保管庫をバインドマウントし、localhostにのみ公開します。実データでは`LIFEDB_VAULT`に絶対パスでバックアップ済みホストパスを設定します。無名Dockerボリュームだけをdurable複製にしてはなりません。
+既定の配置はホスト保管庫をバインドマウントし、localhostにのみ公開します。実データでは`LIFEDB_VAULT`に絶対パスでバックアップ済みホストパスを設定します。無名Dockerボリュームだけをdurable複製にしてはなりません。承認済みの`lifedb-compose.py`ラッパーはCompose起動前に相対パス、保管庫の型、トークンの所有者・モード・最終シンボリックリンク・内容を検証します。rawな`docker compose`コマンドはこれらのホスト検査をバイパスするため、本番では使用しないでください。Compose YAML自体が相対パスやホスト側シンボリックリンクを拒否するという意味ではありません。
+
+`lifedb-compose.py`はリポジトリ直下の`.env`を安全なKEY=VALUE形式で読み込み、シェル展開やコマンド実行は行いません。プロセス環境変数が`.env`より優先されます。`-f`、`--env-file`、`--project-directory`、`COMPOSE_FILE`、`COMPOSE_ENV_FILES`のCompose上書きは拒否され、所有された`compose.yaml`とプロジェクトディレクトリが常に使われます。分離実行には通常どおり`-p <unique-project>`を指定できます。
 
 ## 認証付きHTTP
 
@@ -118,18 +83,7 @@ curl http://127.0.0.1:7331/health
 
 `LIFEDB_SENSITIVITY_CEILING`はサーバーの最大値を定め、既定は`personal`です。要求側はより低い上限を求められますが、引き上げはできません。`LIFEDB_INGEST_SENSITIVITY_FLOOR`はHTTP取得に付与する最小ラベルを定めます。呼び出し側はラベルを引き上げられますが、引き下げはできません。Context予算も検証済みdurableコンテキストポリシーで制限します。
 
-```sh
-curl -X POST http://127.0.0.1:7331/v1/context \
-  -H "Authorization: Bearer ${LIFEDB_API_TOKEN}" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "query": "What are the storage invariants?",
-    "budget_chars": 12000,
-    "core_chars": 4000,
-    "continuity_chars": 2000,
-    "relevant_chars": 6000
-  }'
-```
+認証、health、turn、context、replay、conflict、credential rejectionのHTTP probesは[operator guide](docs/operator-guide.md)を参照してください。
 
 サーバーは要求された感度と文字数予算を自プロファイルに収めます。Context出力は`{durable_sequence, indexed_sequence, dirty}`を報告し、取得メモリをエスケープ済みuntrusted-data区切りで囲みます。
 
@@ -166,12 +120,7 @@ evidence:
 
 `runtime/`の削除により、承認済み知識や観測履歴を失ってはなりません。先にLifeDBサーバーを止め、対象の初期化済み保管庫に限定した保護付きコマンドを使います（広範囲、シンボリックリンク、未初期化の対象は拒否します）。
 
-```sh
-docker compose down
-docker compose run --rm lifedb runtime reset --confirm DELETE-RUNTIME
-docker compose run --rm lifedb rebuild
-docker compose run --rm lifedb validate
-```
+runtime reset、rebuild、validate、retention recoveryの復旧手順は[operator guide](docs/operator-guide.md)を参照してください。
 
 設定済み保管庫パスを確定してから実行します。復旧では取得記録とイベントの完全性、イベント順序、保持オブジェクト、Canonスナップショット、型付きEvidence（証跡）要件、再構築ウォーターマークを検証します。
 
