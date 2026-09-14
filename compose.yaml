@@ -11,15 +11,23 @@ services:
       LIFEDB_VAULT: /data
       LIFEDB_SERVER_BIND: 0.0.0.0
       LIFEDB_PORT: 7331
-      LIFEDB_API_TOKEN: "${LIFEDB_API_TOKEN:-}"
+      LIFEDB_API_TOKEN_FILE: /run/secrets/lifedb-api-token
       LIFEDB_SENSITIVITY_CEILING: "${LIFEDB_SENSITIVITY_CEILING:-personal}"
       LIFEDB_INGEST_SENSITIVITY_FLOOR: "${LIFEDB_INGEST_SENSITIVITY_FLOOR:-personal}"
     ports:
       - "${LIFEDB_BIND:-127.0.0.1}:${LIFEDB_PORT:-7331}:7331"
     volumes:
       - type: bind
-        source: ${LIFEDB_VAULT:-./vault}
+        source: ${LIFEDB_VAULT:?LIFEDB_VAULT must be an absolute existing vault path}
         target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LIFEDB_API_TOKEN_FILE:?LIFEDB_API_TOKEN_FILE must be an absolute mode-0600 token file}
+        target: /run/secrets/lifedb-api-token
+        read_only: true
+        bind:
+          create_host_path: false
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777

@@ -29,6 +29,35 @@ class DockerContextBoundaryTest(unittest.TestCase):
         for forbidden in {"src/", "schemas/", "pyproject.toml", "Dockerfile"}:
             self.assertNotIn(forbidden, rules)
 
+    def test_build_context_excludes_token_files(self) -> None:
+        path = Path(__file__).parents[1] / ".dockerignore"
+        rules = {
+            line.strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        for required in {
+            "*-token",
+            "*.token",
+            "api-token*",
+            "secrets/",
+        }:
+            self.assertIn(required, rules)
+
+    def test_dockerfile_copies_no_secrets_or_vault(self) -> None:
+        lines = (
+            Path(__file__).parents[1] / "Dockerfile"
+        ).read_text(encoding="utf-8").splitlines()
+        copies = [
+            line.strip()
+            for line in lines
+            if line.strip().startswith("COPY")
+        ]
+        self.assertTrue(copies)
+        joined = "\n".join(copies).lower()
+        for forbidden in (".env", "token", "secret", "vault", "quarantine"):
+            self.assertNotIn(forbidden, joined)
+
 
 if __name__ == "__main__":
     unittest.main()

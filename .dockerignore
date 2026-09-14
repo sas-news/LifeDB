@@ -5,6 +5,10 @@ vault/
 lifedb-vault/
 quarantine/
 runtime/
+*-token
+*.token
+api-token*
+secrets/
 
 # Local development and generated artifacts.
 .venv/
