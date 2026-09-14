@@ -1,35 +1,57 @@
-.PHONY: init validate rebuild test up down runtime-reset recovery-drill
+.PHONY: init validate rebuild docs-smoke docs-smoke-docker test ci-local ci-python ci-opencode ci-hermes ci-package-smoke ci-docker up down runtime-reset recovery-drill
+
+docs-smoke:
+	PYTHONPATH=src .venv/bin/python scripts/docs-smoke.py
+
+docs-smoke-docker:
+	PYTHONPATH=src .venv/bin/python scripts/docs-smoke.py --with-docker
 
 init:
-	docker compose run --rm lifedb init
+	python scripts/lifedb-compose.py run --rm lifedb init
 
 validate:
-	docker compose run --rm lifedb validate
+	python scripts/lifedb-compose.py run --rm lifedb validate
 
 rebuild:
-	docker compose run --rm lifedb rebuild
+	python scripts/lifedb-compose.py run --rm lifedb rebuild
 
 test:
-	PYTHONPATH=src python -m unittest discover -s tests -v
+	PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+
+ci-local:
+	./scripts/ci-equivalent.sh all
+
+ci-python:
+	./scripts/ci-equivalent.sh python
+
+ci-opencode:
+	./scripts/ci-equivalent.sh opencode
+
+ci-hermes:
+	./scripts/ci-equivalent.sh hermes
+
+ci-package-smoke:
+	./scripts/ci-equivalent.sh package-smoke
+
+ci-docker:
+	./scripts/ci-equivalent.sh docker
 
 up:
-	docker compose up -d --build
+	python scripts/lifedb-compose.py up -d --build
 
 down:
-	docker compose down
+	python scripts/lifedb-compose.py down
 
 runtime-reset:
 	# Runtime reset is safe only while the server is stopped.
-	@test -n "$(LIFEDB_VAULT)" || (echo "Set LIFEDB_VAULT explicitly"; exit 1)
-	docker compose stop lifedb
-	docker compose run --rm lifedb runtime reset --confirm DELETE-RUNTIME
+	python scripts/lifedb-compose.py stop lifedb
+	python scripts/lifedb-compose.py run --rm lifedb runtime reset --confirm DELETE-RUNTIME
 
 recovery-drill:
 	# Runtime reset is safe only while the server is stopped.
-	@test -n "$(LIFEDB_VAULT)" || (echo "Set LIFEDB_VAULT explicitly"; exit 1)
-	docker compose stop lifedb
-	docker compose run --rm lifedb validate
-	docker compose run --rm lifedb runtime reset --confirm DELETE-RUNTIME
-	docker compose run --rm lifedb rebuild
-	docker compose run --rm lifedb validate
-	docker compose run --rm lifedb search recoverable
+	python scripts/lifedb-compose.py stop lifedb
+	python scripts/lifedb-compose.py run --rm lifedb validate
+	python scripts/lifedb-compose.py run --rm lifedb runtime reset --confirm DELETE-RUNTIME
+	python scripts/lifedb-compose.py run --rm lifedb rebuild
+	python scripts/lifedb-compose.py run --rm lifedb validate
+	python scripts/lifedb-compose.py run --rm lifedb search recoverable
