@@ -17,7 +17,7 @@ class InstallerLifecycleTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.home = self.root / "hermes"
         self.home.mkdir()
-        self.hermes_path = self.root / "bin" / "hermes"
+        self.hermes_path = self.root / "fake-bin" / "hermes"
         self.hermes_path.parent.mkdir()
         self.doctor_log = self.root / "doctor.log"
         self.hermes_path.write_text(
@@ -31,9 +31,10 @@ class InstallerLifecycleTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.hermes_path.chmod(0o755)
-        self.path_patch = patch.dict(os.environ, {"PATH": f"{self.hermes_path.parent}:/usr/local/bin:/usr/bin"}, clear=True)
+        self.path_patch = patch.dict(os.environ, {"PATH": f"{self.hermes_path.parent}:/usr/bin"}, clear=True)
         self.path_patch.start()
         self.addCleanup(self.path_patch.stop)
+        self.assertNotIn("/usr/local/bin", os.environ["PATH"].split(os.pathsep))
         config_path = self.home / "config.yaml"
         config_path.write_text(
             "memory:\n  provider: lancedb\nplugins:\n  enabled: [disk-cleanup]\n  entries:\n    disk-cleanup:\n      settings: {}\n",
