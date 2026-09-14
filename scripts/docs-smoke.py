@@ -105,7 +105,7 @@ def run_smoke(path: Path, output: Path | None = None, *, with_docker: bool = Fal
     if not selected:
         raise SmokeExecutionError("guide has no executable fences")
     definitions = "\n".join(f"smoke_{command.command_id}() {{\n  {command.template}\n}}" for command in COMMANDS)
-    script = "set -eu\n" + definitions + "\n" + "\n".join(fence.body.rstrip() for fence in selected) + "\n"
+    script = "#!/usr/bin/env bash\nset -eu\n" + definitions + "\n" + "\n".join(fence.body.rstrip() for fence in selected) + "\n"
     with tempfile.TemporaryDirectory(prefix="lifedb-docs-") as directory:
         generated = Path(directory) / "operator-guide.sh"
         generated.write_text(script, encoding="utf-8"); generated.chmod(0o700)

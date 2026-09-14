@@ -25,6 +25,9 @@ class DocsSmokeTest(unittest.TestCase):
 
     def test_turn_command_fixtures_encode_distinct_outcomes(self) -> None:
         commands = {command.command_id: command.template for command in MODULE.COMMANDS}
+        self.assertEqual(commands["compose-health"], 'curl "http://127.0.0.1:$PORT/health"')
+        self.assertEqual(commands["http-health"], 'curl "http://127.0.0.1:$PORT/health"')
+        self.assertEqual(commands["http-missing-auth"], 'curl -i -X POST "http://127.0.0.1:$PORT/v1/context" --data \'{}\'')
         self.assertIn('$TURN_JSON"', commands["http-turn"])
         self.assertEqual(commands["http-replay"], commands["http-turn"])
         self.assertIn('$CONFLICT_TURN_JSON"', commands["http-conflict"])
@@ -82,6 +85,7 @@ class DocsSmokeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(output.is_file())
             self.assertEqual(output.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(output.read_text(encoding="utf-8").splitlines()[0], "#!/usr/bin/env bash")
             syntax = subprocess.run(
                 ["bash", "-n", str(output)],
                 capture_output=True,

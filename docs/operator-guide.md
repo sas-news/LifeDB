@@ -123,7 +123,7 @@ PYTHONPATH=src .venv/bin/python scripts/lifedb-compose.py -p "$PROJECT" ps
 ```
 <!-- smoke: command=compose-health owner=compose -->
 ```sh
-curl http://127.0.0.1:$PORT/health
+curl "http://127.0.0.1:$PORT/health"
 ```
 <!-- smoke: command=compose-context owner=compose -->
 ```sh
@@ -159,11 +159,11 @@ PYTHONPATH=src .venv/bin/python scripts/lifedb-compose.py -p "$PROJECT" down
 ```
 <!-- smoke: command=http-health owner=runtime -->
 ```sh
-curl http://127.0.0.1:$PORT/health
+curl "http://127.0.0.1:$PORT/health"
 ```
 <!-- smoke: command=http-missing-auth owner=failure -->
 ```sh
-curl -i -X POST http://127.0.0.1:$PORT/v1/context --data '{}'
+curl -i -X POST "http://127.0.0.1:$PORT/v1/context" --data '{}'
 ```
 <!-- smoke: command=http-wrong-auth owner=failure -->
 ```sh
