@@ -149,8 +149,12 @@ class ResolveApiTokenTest(TokenFileCase):
         def mutating_read(descriptor: int, length: int) -> bytes:
             data = original_read(descriptor, length)
             if data:
+                preserved = os.stat(path)
                 with open(path, "wb") as stream:
                     stream.write(b"X" + token.encode()[1:])
+                # Keep the metadata comparison honest: restore the previous
+                # timestamps so only the byte re-read can detect this write.
+                os.utime(path, ns=(preserved.st_atime_ns, preserved.st_mtime_ns))
                 os.chmod(path, 0o600)
             return data
 

@@ -243,6 +243,15 @@ def read_token_file(path_value: object) -> str:
             or len(payload) != finished.st_size
         ):
             raise ValueError("api token file changed during safe read")
+        # Coarse timestamp granularity can hide a same-size in-place write
+        # that metadata comparison misses, so the bytes are re-read and
+        # compared as well.
+        try:
+            repeated = os.pread(descriptor, len(payload) + 1, 0)
+        except OSError:
+            raise ValueError("api token file cannot be read safely") from None
+        if repeated != payload:
+            raise ValueError("api token file changed during safe read")
         try:
             after = os.lstat(path_value)
         except OSError:
